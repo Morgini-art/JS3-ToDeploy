@@ -9,7 +9,7 @@
         "compile": "pkg server.js -t node18-win-x64",
         "compile-linux": "pkg server.js -t node18-linux-x64",
         "web": "node server.js",
-        "start": "node server.js",
+        "start": "node server.js"
     },
     "author": "",
     "license": "ISC",
