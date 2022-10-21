@@ -8,7 +8,7 @@
         "run": "nodemon server.js",
         "compile": "pkg server.js -t node18-win-x64",
         "compile-linux": "pkg server.js -t node18-linux-x64",
-        "start": "node index.js"
+        "start": "web:node index.js"
     },
     "author": "",
     "license": "ISC",
