@@ -1,10 +1,10 @@
 /*const socket = io('http://192.168.0.9:3000', {
     transports: ['websocket']
 });*/
-const host = 'localhost';
+const host = 'https://js3multiplayer.herokuapp.com/';
 //const host = '192.168.0.9';
 
-const socket = io('http://'+host+':3000', {
+const socket = io('http://'+host+':80', {
     transports: ['websocket']
 });
 
