@@ -8,13 +8,12 @@
         "run": "nodemon server.js",
         "compile": "pkg server.js -t node18-win-x64",
         "compile-linux": "pkg server.js -t node18-linux-x64",
-        "web": "npm i node server.js"
+        "web": "node server.js"
     },
     "author": "",
     "license": "ISC",
     "devDependencies": {
         "nodemon": "^2.0.19",
-        "socket.io": "^4.5.3"
     },
     "dependencies": {
         "express": "^4.18.1",
