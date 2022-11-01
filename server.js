@@ -59,7 +59,7 @@ for (const name of Object.keys(nets)) {
 }
 console.log(results);
 
-server.listen(3000, () => {
+server.listen('172.17.223.38',3000, () => {
     console.log('Server start on: localhost');
     writeToLog('Server start');
 });
