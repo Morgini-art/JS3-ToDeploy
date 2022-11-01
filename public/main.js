@@ -1,12 +1,14 @@
 /*const socket = io('http://192.168.0.9:3000', {
     transports: ['websocket']
 });*/
-const host = 'localhost';
+/*const host = 'localhost';
 //const host = '192.168.0.9';
 
 const socket = io('http://'+host, {
     transports: ['websocket']
-});
+});*/
+
+const socket = io();
 
 const version = '1.0.0';
 
