@@ -59,7 +59,7 @@ for (const name of Object.keys(nets)) {
 }
 console.log(results);
 
-server.listen(80, () => {
+server.listen(process.env.PORT, () => {
     console.log('Server start on: localhost');
     writeToLog('Server start');
 });
