@@ -2,12 +2,9 @@
     "name": "server",
     "version": "1.0.0",
     "description": "",
-    "main": "server.js",
-    "bin": "server.js",
+    "main": "",
+    "bin": "",
     "scripts": {
-        "run": "nodemon server.js",
-        "compile": "pkg server.js -t node18-win-x64",
-        "compile-linux": "pkg server.js -t node18-linux-x64",
         "web": "pm2 link fcsgx93zw743r8x pn34fs24ztdxbd0 pm2 start server.js"
     },
     "author": "",
