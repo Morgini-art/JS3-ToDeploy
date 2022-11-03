@@ -8,7 +8,7 @@
         "run": "nodemon server.js",
         "compile": "pkg server.js -t node18-win-x64",
         "compile-linux": "pkg server.js -t node18-linux-x64",
-        "web": "node server.js"
+        "web": "pm2 start server.js"
     },
     "author": "",
     "license": "ISC",
@@ -16,6 +16,7 @@
         "nodemon": "^2.0.19"
     },
     "dependencies": {
+        "pm2",
         "express": "^4.18.1",
         "socket.io": "^4.5.3",
         "node-os-utils": "^1.3.7",
