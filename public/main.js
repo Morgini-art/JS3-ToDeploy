@@ -1,14 +1,12 @@
 /*const socket = io('http://192.168.0.9:3000', {
     transports: ['websocket']
 });*/
-/*const host = 'localhost';
+const host = 'localhost';
 //const host = '192.168.0.9';
 
-const socket = io('http://'+host, {
+const socket = io('http://'+host+':3000', {
     transports: ['websocket']
-});*/
-
-const socket = io();
+});
 
 const version = '1.0.0';
 
@@ -195,6 +193,8 @@ document.addEventListener('keyup', e => {
         if (cursorMode === 'marking') {
             
         }*/
+    } else if (e.keyCode === 84) {
+        socket.emit('player-change-spell');
     }
 });
 
@@ -390,9 +390,11 @@ socket.on('change-cursor-state', data => {
     } else if (data === 'moving') {
         canUi.style.cursor = 'auto';    
     }*/
+    console.error(cursorMode);
     if (cursorMode === 'marking') {
             clickHandler.style.cursor = 'crosshair';
         } else if (cursorMode === 'direction') {
+            
             clickHandler.style.cursor = 'pointer';   
         } else {
             clickHandler.style.cursor = 'auto';
@@ -585,6 +587,7 @@ function drawInvetory(invetory, ctx, functionDrawText, mode, can, graphics) {
 
         for (let i = 0; i < numberOfBasicSlots; i++) {
             const dSlot = basicSlots[i];
+            console.log(dSlot);
             if (dSlot.content !== 'empty') {
                 if (dSlot.content.itemName === 'Test01') {
                     ctxUi.fillStyle = 'green';
@@ -699,11 +702,11 @@ function updateUi() {
         }
     }
     const hpPercent = convertNumberToPercent(myPlayer.hp, myPlayer.maxHp);
-    //const magicEnergyPercent = convertNumberToPercent(player1.magicEnergy, player1.maxMagicEnergy);
+    const magicEnergyPercent = convertNumberToPercent(myPlayer.magicEnergy, myPlayer.maxMagicEnergy);
     //const actualSpellOfMagicEnergyPercent = convertNumberToPercent(actualPlayerSpell.requiredMagicEnergy, player1.maxMagicEnergy);
     const width = 300;
     const hpPercentWidth = width * hpPercent / 100;
-    //const magicEnergyPercentWidth = width * magicEnergyPercent / 100;
+    const magicEnergyPercentWidth = width * magicEnergyPercent / 100;
     //const actualSpellOfMagicEnergyPercentWidth = width * actualSpellOfMagicEnergyPercent / 100;
     //const to = 15 + magicEnergyPercentWidth;
     //const from = to - actualSpellOfMagicEnergyPercentWidth;
@@ -713,6 +716,8 @@ function updateUi() {
     } else if (oldplayerHpWidthCounter <= playerHpWidthCounter && healthingPlayer) {
         oldplayerHpWidthCounter += 1.2;
     }*/
+    
+
 
     ctxUi.clearRect(0, 0, 1400, 920);
     /*ctxUi.fillText(myPlayer.block, 80, 180);
@@ -722,6 +727,9 @@ function updateUi() {
     if (myPlayer.hp > 0) {
         ctxUi.fillRect(15, 5, hpPercentWidth, 20);
     }*/
+    ctxUi.fillText('Aktualne zaklęcie:'+myPlayer.actualSpell,120, 550);
+    
+    //HP - Bar
     if (hpPercent > 85) {
         ctxUi.drawImage(hpBarFullImage, 15, 5);
         ctxUi.fillStyle = 'black';
@@ -742,10 +750,46 @@ function updateUi() {
         ctxUi.fillStyle = 'black';
         ctxUi.fillText(myPlayer.hp + '/'+ myPlayer.maxHp, 15 + 158, 5 + 35);
     }
+    //END HP - Bar
+    
+    //MANA - Bar
+    if (magicEnergyPercent > 85) {
+        ctxUi.drawImage(hpBarFullImage, 15, 90);
+        ctxUi.fillStyle = 'black';
+        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+    } else if (magicEnergyPercent > 35) {
+        ctxUi.drawImage(hpBarNearlyFullImage, 15, 90);
+        ctxUi.fillStyle = 'blue';
+        console.warn(magicEnergyPercentWidth);
+//        ctxUi.fillRect(15, 5, magicEnergyPercentWidth, 8);
+        
+        ctxUi.clearRect(15 + 254, 90+28 ,(width - magicEnergyPercentWidth) * -1 +90, 22);
+        
+        ctxUi.fillStyle = 'black';
+        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+        
+    } else {
+        ctxUi.drawImage(hpBarEmptyImage, 15, 90);
+        ctxUi.fillStyle = 'black';
+        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+    }
+    //END MANA - Bar
+    
 //    ctxUi.clearRect(268, 32, hpPercentWidth, 22);
     ctxUi.fillStyle = 'green';
     console.warn(hpPercent);
     ctxUi.fillRect(15, 5, hpPercentWidth, 8);
+    
+    
+    if (myPlayer.spellsBuffer.reloadsTimes[0] !== undefined) {
+//        const loadProcess = 100 - convertNumberToPercent(myPlayer.spellsBuffer.reloadsTimes[0], myPlayer.actualSpell.reload[0] * 1000);
+//        const drawingProcess = 65 * loadProcess / 100;
+
+//        ctxUi.fillRect(850, 120, drawingProcess, 65);
+        ctxUi.fillStyle = 'red';
+        ctxUi.fillText(myPlayer.spellsBuffer.reloadsTimes[0],125, 570);
+    }
+    
 //    ctxUi.fillStyle = 'red';
 //    ctxUi.fillRect(15, 0, -35, 8);
 

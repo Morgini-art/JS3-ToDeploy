@@ -220,10 +220,17 @@ const GameObjects = {
     blocks: []
 };
 
+
+//    const y = 800;
+//const x = 1500;
+
 const items = [
     new Item('Test01',3,0,'test01',false),
     new Item('Test02',7,0,'test02',false)
 ];
+
+GameObjects.chests.push(new Chest(1500, 800, 25, 25, new Hitbox(1500, 800, 25, 25), structuredClone(items[0])));
+
 
 const weapons = [
     new Weapon('Pistolet', 1, 3, 1, 20, 20, 'distance', 3, structuredClone(ammunitions[0]), 90),
@@ -234,7 +241,7 @@ const weapons = [
 
 const spells = [
     new Spell('Błyskawica', 18, 'dmg', 'thunderboltAttack', 'enemy:1', 2, 14, 18),
-    new Spell('Kula Ognia', 26, 'dmg', 'ballOfFire', 'direction:hitenemy:1', 3, 28, 31),
+    new Spell('Kula Ognia', 2, 'dmg', 'ballOfFire', 'direction:hitenemy:1', 1, 16, 35),
     new Spell('Magiczna pułapka', 24, 'dmg', 'magicTrap', 'direction:hitenemy:1', 2.6, 12, 27),
     new Spell('Niepamięć', 23, 'time', 'oblivion', 'enemy:1', 7, null, null, 4)
 ];
@@ -242,7 +249,8 @@ const spells = [
 //const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])],);
 //player1.ammunition[0].allAmmunition = 15;
 
-GameObjects.enemies.push(new Enemy(0, 450, 80, 50, 65, 1000, 1000, weapons[3], new Hitbox(undefined, undefined, 50, 65), 1, 1, null, 1, 0, [structuredClone(ammunitions[1])]));
+GameObjects.enemies.push(new Enemy(0, 450, 80, 50, 65, 40, 40, weapons[3], new Hitbox(undefined, undefined, 50, 65), 1, 1, structuredClone(items[1]), 1, 0, [structuredClone(ammunitions[1])]));
+console.log(GameObjects.enemies[0]);
 
 GameObjects.enemies[0].secondAiState = 'icanshoot?';
 GameObjects.enemies[0].ammunition[0].allAmmunition = 15;
@@ -360,7 +368,7 @@ io.on('connection', (socket) => {
     fillInvetoryWithSlots(newInvetory);
     newInvetory.basicSlots[0].content = items[0];
     newInvetory.basicSlots[2].content = items[1];
-    const newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 50, 50, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells));
+    const newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 250, 280, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells));
     //    const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])]);
     newPlayer.ammunition[0].allAmmunition = 15;
     players.push(newPlayer);
@@ -398,11 +406,11 @@ io.on('connection', (socket) => {
     socket.on('request-cursor-mode', data => {
         for (const player of gamePlayers) {
             if (socket.id === player.id) {
-                console.log(player.actualSpell);
                 for (const spell of spells) {
                     if (spell.name === player.actualSpell) {
+                        console.log('Player:',player.actualSpell, 'Finded:',spell.name);
                         const cursorMode = spell.bewitch(data, player, 'player', player.spellsBuffer);
-                        socket.emit('change-cursor-state', cursorMode);    
+                        socket.emit('change-cursor-state', cursorMode);
                     }
                 }
             }
@@ -413,89 +421,98 @@ io.on('connection', (socket) => {
         console.log(data);
         for (const player of gamePlayers) {
             if (socket.id === player.id) {
-//                let counter = 0;
-                const objects = GameObjects.enemies.concat(gamePlayers);
-                socket.emit('change-cursor-state', 'auto');
-                console.log(objects.length, GameObjects.enemies.length + gamePlayers.length);
-
-                for (const object of objects) {
-
-                    const collisionWith = checkCollisionWith(data, object.hitbox);
-                    console.log(collisionWith, data, object.hitbox);
-                    if (collisionWith) {
-                        let actualSpell;
-                        for (const spell of spells) {
-                            if (player.actualSpell === spell.name) {
-                                actualSpell = spell;
-                                break;
-                            }
-                        }
-                        console.log('DWA', object);
-                        socket.emit('change-cursor-state', 'auto');
-                        //                        can.style.cursor = 'auto';
-                        //                        player1.magicEnergy -= actualPlayerSpell.requiredMagicEnergy;
-                        if (actualSpell.action === 'thunderboltAttack') {
-                            console.log('AA');
-                            actualSpell.completeSpell(object);
-                        } else if (actualSpell.action === 'oblivion' && object.aiState !== undefined) {
-                            const oldAiState = object.aiState;
-                            const oldSecondAiState = object.secondAiState;
-                            //
-                            object.aiState = 'oblivion';
-                            object.secondAiState = 'oblivion';
-                            //
-                            setTimeout(() => {
-                                console.log(object.aiState)
-                            }, 100);
-                            //
-                            setTimeout(() => {
-                                object.aiState = oldAiState;
-                                object.secondAiState = oldSecondAiState;
-                            }, actualSpell.time * 1000);
-                        }
+                let actualSpell;
+                for (const spell of spells) {
+                    if (player.actualSpell === spell.name) {
+                        actualSpell = spell;
+                        break;
                     }
                 }
-                
-//                let actualSpell;
-//                for (const spell of spells) {
-//                    if (player.actualSpell === spell.name) {
-//                        actualSpell = spell;
-//                        break;
-//                    }
-//                }
-//                const {
-//                    action,
-//                    minDmg,
-//                    maxDmg
-//                } = actualSpell;
-//                let bulletWidth, bulletHeight;
-//                
-//                if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
-//                    if (action === 'ballOfFire') {
-//                        bulletWidth = 50;
-//                        bulletHeight = 50;
-//                    } else if (action === 'magicTrap') {
-//                        bulletHeight = 25;
-//                        bulletWidth = 25;
-//                    }
-//                    //                player1.magicEnergy -= actualPlayerSpell.requiredMagicEnergy;
-//                    //                playerSpellsBuffer.spells.push(actualPlayerSpell.name);
-//                    //                playerSpellsBuffer.reloadsTimes.push(actualPlayerSpell.reload * 1000);
-//
-//                    GameObjects.bullets.push(new Bullet(x, y, bulletWidth, bulletHeight, new Hitbox(data.x, data.y, bulletWidth, bulletHeight), 2, minDmg, maxDmg, data.x, data.y, player.id, 560));
-//                    if (action === 'magicTrap') {
-//                        GameObjects.bullets[bullets.length - 1].getMove = false;
-//                        bullets[bullets.length - 1].distance = 1;
-//                    }
-//
-//                    for (const bullet of GameObjects.bullets) {
-//                        if (bullet.owner === 'player') {
-//                            bullet.checkTheDirection(player);
-//                        }
-//                    }
-//                    cursorMode = 'moving';
-//                    can.style.cursor = 'auto';
-//                }
+
+                if (actualSpell.availablesObjects.substr(0, 5) === 'enemy') {
+                    const objects = GameObjects.enemies.concat(gamePlayers);
+                    socket.emit('change-cursor-state', 'auto');
+                    console.log(objects.length, GameObjects.enemies.length + gamePlayers.length);
+
+                    for (const object of objects) {
+
+                        const collisionWith = checkCollisionWith(data, object.hitbox);
+                        //                    console.log(collisionWith, data, object.hitbox);
+                        if (collisionWith) {
+
+                            //                        console.log('DWA', object);
+                            socket.emit('change-cursor-state', 'auto');
+                            //                        can.style.cursor = 'auto';
+                            player.magicEnergy -= actualSpell.requiredMagicEnergy;
+                            if (actualSpell.action === 'thunderboltAttack') {
+                                console.log('AA');
+                                actualSpell.completeSpell(object);
+                                player.spellsBuffer.spells.push('thunderboltAttack');
+                                player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
+                                console.log(player.spellsBuffer.reloadsTimes, player.spellsBuffer.spells);
+                            } else if (actualSpell.action === 'oblivion' && object.aiState !== undefined) {
+                                const oldAiState = object.aiState;
+                                const oldSecondAiState = object.secondAiState;
+                                //
+                                object.aiState = 'oblivion';
+                                object.secondAiState = 'oblivion';
+
+                                player.spellsBuffer.spells.push('oblivion');
+                                player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
+                                //
+                                setTimeout(() => {
+                                    console.log(object.aiState)
+                                }, 100);
+                                //
+                                setTimeout(() => {
+                                    object.aiState = oldAiState;
+                                    object.secondAiState = oldSecondAiState;
+                                }, actualSpell.time * 1000);
+                            }
+                        }
+                    }
+                } else if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
+                    const {
+                        action,
+                        minDmg,
+                        maxDmg
+                    } = actualSpell;
+                    let bulletWidth, bulletHeight;
+
+                    if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
+                        if (action === 'ballOfFire') {
+                            bulletWidth = 50;
+                            bulletHeight = 50;
+                        } else if (action === 'magicTrap') {
+                            bulletHeight = 25;
+                            bulletWidth = 25;
+                        }
+                        player.magicEnergy -= actualSpell.requiredMagicEnergy;
+                        player.spellsBuffer.spells.push(actualSpell.action);
+                        player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
+                        
+                        
+                        GameObjects.bullets.push(new Bullet(player.x, player.y, bulletWidth, bulletHeight, new Hitbox(player.x, player.y, bulletWidth, bulletHeight), 2, minDmg, maxDmg, data.x, data.y, player.id, 560));
+
+                        console.log(GameObjects.bullets[GameObjects.bullets.length - 1]);
+
+                        if (action === 'magicTrap') {
+                            GameObjects.bullets[GameObjects.bullets.length - 1].getMove = false;
+                            GameObjects.bullets[GameObjects.bullets.length - 1].distance = 1;
+                        }
+
+                        for (const bullet of GameObjects.bullets) {
+                            console.log(bullet);
+                            if (bullet.owner === player.id) {
+                                console.log('TRUE', player, 'TRUE');
+                                bullet.checkTheDirection(player);
+                            }
+                        }
+                        /*cursorMode = 'moving';
+                        can.style.cursor = 'auto';*/
+                        socket.emit('change-cursor-state', 'moving');
+                    }
+                }
             }
         }
     });
@@ -554,15 +571,13 @@ io.on('connection', (socket) => {
             if (socket.id === player.id && player.state !== 'spectator') {
                 for (const chest of GameObjects.chests) {
                     if (checkCollisionWith(player.hitbox, chest.hitbox)) {
-                        //chest.open(player, player.playerInvetory); TODO: Zrób otwieranie skrzynek i dodawania ich do ekwipunku gracza
+                        chest.open(player, player.invetory);
                         console.log('Player with name:'+player.name+' (id)'+player.id+'open the chest.');
                     }
                 }
             }
         }
     });
-    
-    
     
     socket.on('player-change-weapon', data => {
         for (const player of gamePlayers) {
@@ -571,6 +586,18 @@ io.on('connection', (socket) => {
                 player.weaponCounter++;
                 if (player.weaponCounter === 4) {
                     player.weaponCounter = 0;   
+                }
+            }
+        }
+    });
+    
+    socket.on('player-change-spell', data => {
+        for (const player of gamePlayers) {
+            if (socket.id === player.id && player.state !== 'spectator') {
+                player.actualSpell = spells[player.spellCounter].name;
+                player.spellCounter++;
+                if (player.spellCounter === 4) {
+                    player.spellCounter = 0;   
                 }
             }
         }
@@ -757,12 +784,21 @@ function updateHitboxs()
 function playerLoop() {
     //socket.emit('moving-player', {x: mouseX, y: mouseY});
     for (const player of gamePlayers) {
-        const {movingSpeed, x, y, width, height} = player;
+        const {movingSpeed, x, y, width, height, spellsBuffer} = player;
         
         let oldX = x;
         let oldY = y;
         let oldDirectionX = player.movingDirectionAxisX;
         let oldDirectionY = player.movingDirectionAxisY;
+        
+        const lenght = spellsBuffer.spells.length;
+        for (let i = 0; i < lenght; i++) {
+            spellsBuffer.reloadsTimes[i] -= 15;
+            if (spellsBuffer.reloadsTimes[i] <= 0) {
+                spellsBuffer.reloadsTimes.splice(i, 1);
+                spellsBuffer.spells.splice(i, 1);
+            }
+        }
         
         if (player.movingDirectionAxisX === 'Left') {
             player.x -= movingSpeed;
