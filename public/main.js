@@ -4,9 +4,7 @@
 const host = 'localhost';
 //const host = '192.168.0.9';
 
-const socket = io('http://'+host+':3000', {
-    transports: ['websocket']
-});
+const socket = io();
 
 const version = '1.0.0';
 
