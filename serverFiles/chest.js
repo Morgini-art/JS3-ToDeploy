@@ -30,10 +30,16 @@ class Chest {
         if (!isOpen) {
             this.isOpen = true;
             var end = false;
+            console.log(openerInvetory);
             openerInvetory.basicSlots.forEach((slot, actualId) => {
                 if (slot.content === 'empty' && !end) {
                     openerInvetory.basicSlots[actualId].content = content;
+                    openerInvetory.basicSlots[actualId].amount = content.amount;
                     console.log(openerInvetory.basicSlots);
+                    console.log(slot);
+                    end = true;
+                } else if (slot.content.itemName === content.itemName) {
+                    openerInvetory.basicSlots[actualId].amount += content.amount;
                     console.log(slot);
                     end = true;
                 }

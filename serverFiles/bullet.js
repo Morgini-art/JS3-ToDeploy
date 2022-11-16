@@ -33,6 +33,8 @@ class Bullet {
         const {targetX, targetY, directionSet} = this;
         const {x, y, width} = wieldingWeapon;
         
+        console.log('WWWWWWWWWWWWW', x, y, width);
+        
         if (!directionSet) {
             this.movingDirectionAxisX = (x < targetX) ? this.movingDirectionAxisX = 'Right' : this.movingDirectionAxisX = 'Left';
             this.movingDirectionAxisY = (y > targetY) ? this.movingDirectionAxisY = 'Up' : this.movingDirectionAxisY = 'Down';

@@ -1,11 +1,3 @@
-/*const socket = io('http://192.168.0.9:3000', {
-    transports: ['websocket']
-});*/
-const host = 'localhost';
-//const host = '192.168.0.9';
-
-const socket = io();
-
 const version = '1.0.0';
 
 const can = document.querySelector('#game');
@@ -27,8 +19,9 @@ let originY = 0;
 let cursorMode = 'none';
 
 let showInvetory = false;
+let showCrafting = false;
 
-startGameBtn.addEventListener('click',()=>{
+startGameBtn.addEventListener('click', () => {
     startGame();
 });
 
@@ -47,8 +40,8 @@ class Hitbox {
 }
 
 const camera = {
-    x : 0,
-    y : 0,
+    x: 0,
+    y: 0,
     hitbox: new Hitbox(0, 0, 1216, 800)
 };
 
@@ -79,11 +72,16 @@ class Button {
         this.image = image;
         this.hitbox;
     }
-    
+
     draw() {
-        const {image, x, y, active} = this;
+        const {
+            image,
+            x,
+            y,
+            active
+        } = this;
         if (active) {
-            ctx.drawImage(image, x, y);    
+            ctx.drawImage(image, x, y);
         }
     }
 }
@@ -117,198 +115,253 @@ grassSpritesheet.src = 'img/world/grass.png';
 //END - IMAGES
 
 const uiButtons = {
-    open: new Button(575, 650, 50, 50, 'open-chest', false, openUiBtnImage),   
-    changeWeapon: new Button(50, 650, 100, 100, 'change-weapon', true, changeWeaponUiBtnImage), 
-    shoot: new Button(50, 500, 100, 100, 'shoot', mobile, shootUiBtnImage) 
+    open: new Button(575, 650, 50, 50, 'open-chest', false, openUiBtnImage),
+    changeWeapon: new Button(50, 650, 100, 100, 'change-weapon', true, changeWeaponUiBtnImage),
+    shoot: new Button(50, 500, 100, 100, 'shoot', mobile, shootUiBtnImage)
 };
 
 const log = document.getElementById('log');
 
-function startGame () {
+function startGame() {
     const mode = document.getElementById('player-mode').value;
     console.log(mode);
     if (playerNick.value !== '') {
+        let state;
         if (mode === 'player') {
-            myPlayer.state = 'yesPlay';    
+            state = 'yesPlay';
         } else if (mode === 'spectator') {
-            myPlayer.state = 'spectator';        
+            state = 'spectator';
         }
-        
+
+        const host = 'localhost';
+
+        const socket = io(); //Connect => connected
+                
         const object = {
-            state: myPlayer.state,
+            state: state,
             name: playerNick.value
         };
-        socket.emit('enter-to-game', object);
+        
+        socket.emit('enter-to-game', object); //Server check version (true) => :145 or(false) => :149
+
+        socket.once('assign-player', data => {
+            myPlayer = data;
+        });
+        
+        socket.on('get-version', (callback) => {
+            /*callback({
+                version: version
+            });*/
+        });
+        
+        socket.on('delete-connection', data => {
+            socket = null;
+            alert('Your client version is no good');
+        });
+
+        socket.on('send-alert', data => {
+            alert(data);
+        });
+
+        socket.on('send-blocks-stats', data => {
+            blocksStats = data;
+        });
+
+        socket.on('change-cursor-state', data => {
+            cursorMode = data;
+            console.error(cursorMode);
+            if (cursorMode === 'marking') {
+                clickHandler.style.cursor = 'crosshair';
+            } else if (cursorMode === 'direction') {
+
+                clickHandler.style.cursor = 'pointer';
+            } else {
+                clickHandler.style.cursor = 'auto';
+                cursorMode = 'moving';
+            }
+        });
+
+        socket.on('send-status-server', data => {
+            if (data.state === 'connected') {
+                serverStatusInfo.innerHTML = 'Server status: Connected';
+                socket.emit('client-version', version);
+                serverStatusInfo.innerHTML += 'Server status: Connected Checking Version';
+            } else {
+                serverStatusInfo.innerHTML = data;
+            }
+        });
+
+        socket.on('send-info', data => {
+            info.innerHTML = data;
+        });
+
+        socket.on('send-players', data => {
+            gamePlayers = data;
+            for (const player of gamePlayers) {
+                if (socket.id === player.id) {
+                    if (JSON.stringify(myPlayer) !== JSON.stringify(player)) {
+                        myPlayer = player;
+                        updateUi();
+                        socket.emit('update-object');
+                    }
+                } else {
+                    console.log(player.movingSpeed);
+                }
+            }
+        });
+
+        socket.on('send-bullets', data => {
+            gameBullets = data;
+        });
+
+        socket.on('send-chests', data => {
+            gameChests = data;
+        });
+
+        socket.on('send-enemies', data => {
+            gameEnemies = data;
+        });
+
+        socket.on('send-map', data => {
+            gameMap = data;
+        });
+
+        socket.on('send-blocks', data => {
+            gameBlocks = data;
+        });
+
+        socket.on('send-game-state', data => {
+            gameState = data;
+        });
+
+        socket.on('send-chunks', data => {
+            gameChunks = data;
+        });
+        
+        
+        //EVENTS-------------------------------------------------------------------------------------------------------------------------------
+        
+        document.addEventListener('keyup', e => {
+            if (e.keyCode === 32) {
+                e.preventDefault();
+                socket.emit('player-open-chest');
+            } else if (e.keyCode === 86) {
+                socket.emit('player-change-weapon');
+            } else if (e.keyCode === 69) {
+                socket.emit('request-cursor-mode', cursorMode);
+            } else if (e.keyCode === 84) {
+                socket.emit('player-change-spell');
+            }
+        });
+
+        clickHandler.addEventListener('click', e => {
+
+            console.warn(checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.open.x, uiButtons.open.y, uiButtons.open.width, uiButtons.open.height)));
+            if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.open.x, uiButtons.open.y, uiButtons.open.width, uiButtons.open.height))) {
+                console.log('SSSSS');
+
+                socket.emit('player-open-chest');
+            } else if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.changeWeapon.x, uiButtons.changeWeapon.y, uiButtons.changeWeapon.width, uiButtons.changeWeapon.height))) {
+                socket.emit('player-change-weapon');
+            } else if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.shoot.x, uiButtons.shoot.y, uiButtons.shoot.width, uiButtons.shoot.height))) {
+                mobileShootingCursor = !mobileShootingCursor;
+            } else if (!mobileShootingCursor) {
+                
+            } else if (mobileShootingCursor) {
+                const object = {
+                    x: e.offsetX,
+                    y: e.offsetY
+                };
+                console.log(object);
+                socket.emit('player-attack', object);
+            }
+
+            if (cursorMode === 'marking') {
+                let counter = 0;
+                let uses = false;
+                const targetX = (e.offsetX - 700) + myPlayer.x;
+                const targetY = (e.offsetY - 460) + myPlayer.y;
+                const cursorHitbox = new Hitbox(targetX, targetY, 5, 5);
+
+                console.error('DWAAAAAAAA', cursorHitbox, myPlayer.x, myPlayer.y);
+                socket.emit('spell-marking', cursorHitbox);
+
+               
+            } else if (cursorMode === 'direction') {
+               
+            }
+
+        });
+
+
+        document.addEventListener('mousedown', (e) => {
+            socket.emit('player-mouse-down', e.which);
+        });
+
+        window.oncontextmenu = function () {
+            return false;
+        }
+
+        document.addEventListener('mouseup', (e) => {
+            socket.emit('player-mouse-up', e.which);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            socket.emit('player-start-move', e.keyCode);
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.keyCode === 73) {
+                showInvetory = !showInvetory;
+                updateUi();
+            } else if (e.keyCode === 52) {
+                showCrafting = !showCrafting;
+                updateUi();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            socket.emit('player-stop-move', e.keyCode);
+        });
+
+        setInterval(() => {
+            const start = Date.now();
+
+            socket.emit('ping', () => {
+                const duration = Date.now() - start;
+
+                ping = duration + 'ms';
+            });
+        }, 1000);
+
+        clickHandler.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            console.log(e);
+            const object = {
+                x: e.offsetX,
+                y: e.offsetY
+            };
+            console.log(object);
+            socket.emit('player-attack', object);
+            console.log('playerattack');
+        });
+
+
+
         gameWindow.style.display = 'grid';
-//        can.style.display = 'block';
+        //        can.style.display = 'block';
         canUi.style.display = 'block';
         canDirty.style.display = 'block';
         clickHandler.style.display = 'block';
         startMenu.style.display = 'none';
-       // gameWindow.requestFullscreen(({ navigationUI: 'show' }));
+        // gameWindow.requestFullscreen(({ navigationUI: 'show' }));
         if (mobile) {
-            let width = /*Math.min(1200, window.innerWidth);*/1200;
-            let height = /*Math.min(800, window.innerHeight);*/800;
-            /*can.width = width;
-            canUi.width = width;
-            clickHandler.width = width;
-            can.height = height;
-            canUi.height = height;
-            clickHandler.height = height;
-            
-            can.style.height = window.innerHeight+'px';
-            canUi.style.height = window.innerHeight+'px';
-            clickHandler.style.height = window.innerHeight+'px';*/
-            
-            /*can.style.width = window.innerWidth+'px';
-            canUi.style.width = window.innerWidth+'px';
-            clickHandler.style.width = window.innerWidth+'px';*/
-            
-//            gameWindow.height = innerHeight;
-            //gameWindow.requestFullscreen();
+            let width = /*Math.min(1200, window.innerWidth);*/ 1200;
+            let height = /*Math.min(800, window.innerHeight);*/ 800;
         }
     }
 }
 
-document.addEventListener('keyup', e => {
-    if (e.keyCode === 32) {
-        e.preventDefault();
-        socket.emit('player-open-chest');
-    } else if (e.keyCode === 86) {
-        socket.emit('player-change-weapon');
-    } else if (e.keyCode === 69) {
-//        bewitch(cursorMode ,thrower, typeOfThrower, spellsBuffer) {
-        socket.emit('request-cursor-mode', cursorMode);
-//        cursorMode = actualPlayerSpell.bewitch(cursorMode, player1, 'player', playerSpellsBuffer);
-        /*if (cursorMode === 'marking') {
-            canUi.style.cursor = 'crosshair';
-        } else if (cursorMode === 'direction') {
-            canUi.style.cursor = 'pointer';
-        } else {
-            canUi.style.cursor = 'auto';
-            cursorMode = 'moving';
-        }
-        if (cursorMode === 'marking') {
-            
-        }*/
-    } else if (e.keyCode === 84) {
-        socket.emit('player-change-spell');
-    }
-});
-
-clickHandler.addEventListener('click', e => {
-
-    console.warn(checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.open.x, uiButtons.open.y, uiButtons.open.width, uiButtons.open.height)));
-    if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.open.x, uiButtons.open.y, uiButtons.open.width, uiButtons.open.height))) {
-        console.log('SSSSS');
-
-        socket.emit('player-open-chest');
-    } else if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.changeWeapon.x, uiButtons.changeWeapon.y, uiButtons.changeWeapon.width, uiButtons.changeWeapon.height))) {
-        socket.emit('player-change-weapon');
-    } else if (checkCollisionWith(new Hitbox(e.offsetX, e.offsetY, 4, 4), new Hitbox(uiButtons.shoot.x, uiButtons.shoot.y, uiButtons.shoot.width, uiButtons.shoot.height))) {
-        mobileShootingCursor = !mobileShootingCursor;
-    } else if (!mobileShootingCursor) {
-        /* socket.emit('moving-player', {
-             x: e.offsetX,
-             y: e.offsetY,
-         });*/
-
-    } else if (mobileShootingCursor) {
-        const object = {
-            x: e.offsetX,
-            y: e.offsetY
-        };
-        console.log(object);
-        socket.emit('player-attack', object);
-    }
-    
-    if (cursorMode === 'marking') {
-        let counter = 0;
-        let uses = false;
-        const targetX = (e.offsetX - 700) + myPlayer.x;
-        const targetY = (e.offsetY - 460) + myPlayer.y;
-        const cursorHitbox = new Hitbox(targetX, targetY, 5, 5);
-        
-        console.error('DWAAAAAAAA', cursorHitbox, myPlayer.x, myPlayer.y);
-        socket.emit('spell-marking', cursorHitbox);
-        
-        /*for (const enemy of enemies) {
-            const collisionWith = checkCollisionWith(cursorHitbox, enemy.hitbox);
-            if (collisionWith) {
-                can.style.cursor = 'auto';
-                if (!uses) {
-                    player1.magicEnergy -= actualPlayerSpell.requiredMagicEnergy;
-                    if (actualPlayerSpell.action === 'thunderboltAttack') {
-                        actualPlayerSpell.completeSpell(enemy);
-                    } else if (actualPlayerSpell.action === 'oblivion') {
-                        const oldAiState = enemy.aiState;
-                        const oldSecondAiState = enemy.secondAiState;
-
-                        enemy.aiState = 'oblivion';
-                        enemy.secondAiState = 'oblivion';
-
-                        setTimeout(() => {
-                            console.log(enemy.aiState)
-                        }, 100);
-
-                        setTimeout(() => {
-                            enemy.aiState = oldAiState;
-                            enemy.secondAiState = oldSecondAiState;
-                        }, actualPlayerSpell.time * 1000);
-                    }
-                    cursorMode = 'moving';
-                    counter++;
-                }
-            }
-            if (Number(actualPlayerSpell.availablesObjects.substr(6)) <= counter) {
-                uses = true;
-                playerSpellsBuffer.spells.push(actualPlayerSpell.name);
-                playerSpellsBuffer.reloadsTimes.push(actualPlayerSpell.reload * 1000);
-            }
-        }*/
-    } else if (cursorMode === 'direction') {
-        /*const {
-            x,
-            y
-        } = player1;
-        const {
-            action,
-            minDmg,
-            maxDmg
-        } = actualPlayerSpell;
-        const {
-            offsetX,
-            offsetY
-        } = e;
-        let bulletWidth, bulletHeight;
-        if (action === 'ballOfFire') {
-            bulletWidth = 50;
-            bulletHeight = 50;
-        } else if (action === 'magicTrap') {
-            bulletHeight = 25;
-            bulletWidth = 25;
-        }*/
-        /*player1.magicEnergy -= actualPlayerSpell.requiredMagicEnergy;
-        playerSpellsBuffer.spells.push(actualPlayerSpell.name);
-        playerSpellsBuffer.reloadsTimes.push(actualPlayerSpell.reload * 1000);
-
-        bullets.push(new Bullet(x, y, bulletWidth, bulletHeight, new Hitbox(x, y, bulletWidth, bulletHeight), 2, minDmg, maxDmg, offsetX, offsetY, 'player', 560));
-        if (action === 'magicTrap') {
-            bullets[bullets.length - 1].getMove = false;
-            bullets[bullets.length - 1].distance = 1;
-        }
-
-        for (const bullet of bullets) {
-            if (bullet.owner === 'player') {
-                bullet.checkTheDirection(player1);
-            }
-        }
-        cursorMode = 'moving';
-        can.style.cursor = 'auto';*/
-    }
-
-//    console.log(mobileShootingCursor);
-});
 
 let mouseX;
 let mouseY;
@@ -318,146 +371,6 @@ clickHandler.addEventListener('mousemove', (e) => {
     mouseY = e.offsetY;
 });
 
-document.addEventListener('mousedown', (e) => {
-    socket.emit('player-mouse-down', e.which);
-});
-
-window.oncontextmenu = function () {
-    return false;
-}
-
-document.addEventListener('mouseup', (e) => {
-    socket.emit('player-mouse-up', e.which);
-});
-
-document.addEventListener('keydown', (e)=>{
-    socket.emit('player-start-move', e.keyCode);
-}); 
-
-document.addEventListener('keyup', (e)=>{
-    if (e.keyCode === 73) {
-        showInvetory = !showInvetory;
-        updateUi();
-    }
-}); 
-
-document.addEventListener('keyup', (e)=>{
-    socket.emit('player-stop-move', e.keyCode);
-}); 
-
-setInterval(() => {
-    const start = Date.now();
-
-    socket.emit('ping', () => {
-        const duration = Date.now() - start;
-        
-        ping = duration + 'ms';
-//        .clearRect(15, 65, 100, 20);
-//        ctxUi.fillText('Ping:'+ping, 15, 65);
-    });
-}, 1000);
-
-clickHandler.addEventListener('contextmenu', e => {
-    e.preventDefault();
-    console.log(e);
-    const object = {
-        x : e.offsetX,
-        y : e.offsetY
-    };
-    console.log(object);
-    socket.emit('player-attack', object);
-    console.log('playerattack');
-});
-
-socket.on('assign-player', data => {
-    myPlayer = data;
-});
-
-socket.on('send-alert', data => {
-    alert(data);
-});
-
-socket.on('send-blocks-stats', data => {
-    blocksStats = data;
-});
-
-socket.on('change-cursor-state', data => {
-    cursorMode = data;
-    /*if (data === 'marking') {
-        canUi.style.cursor = 'auto';    
-    } else if (data === 'moving') {
-        canUi.style.cursor = 'auto';    
-    }*/
-    console.error(cursorMode);
-    if (cursorMode === 'marking') {
-            clickHandler.style.cursor = 'crosshair';
-        } else if (cursorMode === 'direction') {
-            
-            clickHandler.style.cursor = 'pointer';   
-        } else {
-            clickHandler.style.cursor = 'auto';
-            cursorMode = 'moving';
-        }
-//    canUi.style.cursor = data;
-//    cursorMode = data;
-});
-
-socket.on('send-status-server', data => {
-    if (data.state === 'connected') {
-        serverStatusInfo.innerHTML = 'Server status: Connected';
-        socket.emit('client-version', version);
-        serverStatusInfo.innerHTML += 'Server status: Connected Checking Version';
-    } else {
-        serverStatusInfo.innerHTML = data;
-    }
-});
-
-socket.on('send-info', data => {
-    info.innerHTML = data;
-});
-
-socket.on('send-players', data => {
-    gamePlayers = data;
-    for (const player of gamePlayers) {
-        if (socket.id === player.id) {
-            if (JSON.stringify(myPlayer) !== JSON.stringify(player)) {
-                myPlayer = player;  
-                updateUi();
-                socket.emit('update-object');
-            }
-        } else {
-            console.log(player.movingSpeed);
-        }
-    }
-});
-
-socket.on('send-bullets', data => {
-    gameBullets = data;
-});
-
-socket.on('send-chests', data => {
-    gameChests = data;
-});
-
-socket.on('send-enemies', data => {
-    gameEnemies = data;
-});
-
-socket.on('send-map', data => {
-    gameMap = data;
-});
-
-socket.on('send-blocks', data => {
-    gameBlocks = data;
-});
-
-socket.on('send-game-state', data => {
-    gameState = data;
-});
-
-socket.on('send-chunks', data => {
-    gameChunks = data;
-});
 
 ctx.font = '20px Monospace';
 ctxUi.font = '20px Monospace';
@@ -487,7 +400,7 @@ function setCamera() {
     if (gameState === 'play') {
         dirtyCtx.clearRect(0, 0, canDirty.width, canDirty.height);
         dirtyCtx.drawImage(can, myPlayer.x - 700, myPlayer.y - 460, canDirty.width, canDirty.height, 0, 0, 1400, 920);
-    }        
+    }
 }
 
 function drawBullets(gameBullets) {
@@ -519,9 +432,9 @@ function drawMap(gameMap) {
             }
         }
     }*/
-    
-    
-     if (gameChunks.length !== 0) {
+
+
+    if (gameChunks.length !== 0) {
         for (let width = 0; width < 3; width++) {
             for (let height = 0; height < 3; height++) {
                 const chunk = gameChunks[width][height];
@@ -559,7 +472,7 @@ function checkCollisionWith(hitbox1, hitbox2) {
         hitbox1.x + hitbox1.width > hitbox2.x &&
         hitbox1.y < hitbox2.y + hitbox2.height &&
         hitbox1.height + hitbox1.y > hitbox2.y) {
-        
+
         return true;
 
     } else {
@@ -596,7 +509,7 @@ function drawInvetory(invetory, ctx, functionDrawText, mode, can, graphics) {
             }
         }
     }
-    
+
     if (showInvetory) {
         for (const slot of myPlayer.invetory.basicSlots) {
             const slotHitbox = new Hitbox(323 + slot.x, 126 + slot.y, 85, 85);
@@ -609,6 +522,7 @@ function drawInvetory(invetory, ctx, functionDrawText, mode, can, graphics) {
                 if (slot.content !== 'empty') {
                     //                drawText(323 + 55, 126 + 490 + 20, slot.content.itemName, 'black', 20);
                     ctxUi.fillText(slot.content.itemName, 323 + slot.x, 126 + slot.y + 20);
+                    ctxUi.fillText(slot.amount, 323 + slot.x, 126 + slot.y + 20 + 20);
                 } else {
                     //                drawText(323 + slot.x, 126 + slot.y + 20, slot.content, 'black', 20);
                     ctxUi.fillText(slot.content, 323 + slot.x, 126 + slot.y + 20);
@@ -617,6 +531,35 @@ function drawInvetory(invetory, ctx, functionDrawText, mode, can, graphics) {
         }
     }
     
+    if (showCrafting) {
+        for (const recipe of myPlayer.recipes) {
+            let counter = 780;
+            console.log(recipe);
+            for (const ingredient of recipe.ingredients) {
+                ctxUi.fillText(ingredient.item.itemName+'/'+ingredient.amount, 780, counter);
+                counter += 30;
+            }
+//            ctxUi.fillText(recipe.products[], 323 + slot.x, 126 + slot.y + 20);
+            /*const slotHitbox = new Hitbox(323 + slot.x, 126 + slot.y, 85, 85);
+            const cursor = new Hitbox(mouseX, mouseY, 1, 1);
+            const collisionWith = checkCollisionWith(cursor, slotHitbox);
+
+            if (collisionWith) {
+                console.log(slot);
+                ctxUi.fillStyle = 'black';
+                if (slot.content !== 'empty') {
+                    //                drawText(323 + 55, 126 + 490 + 20, slot.content.itemName, 'black', 20);
+                    ctxUi.fillText(slot.content.itemName, 323 + slot.x, 126 + slot.y + 20);
+                    ctxUi.fillText(slot.amount, 323 + slot.x, 126 + slot.y + 20 + 20);
+                } else {
+                    //                drawText(323 + slot.x, 126 + slot.y + 20, slot.content, 'black', 20);
+                    ctxUi.fillText(slot.content, 323 + slot.x, 126 + slot.y + 20);
+                }
+            }*/
+        }
+    }
+
+
 }
 
 function drawPlayers(gamePlayers) {
@@ -632,7 +575,7 @@ function drawPlayers(gamePlayers) {
                 ctx.fillRect(player.x, player.y - 12, player.width, 8);
                 if (player.hp > 0) {
                     ctx.fillStyle = '#f74d4d';
-                    ctx.fillRect(player.x, player.y - 12, hpBarWidth, 8);    
+                    ctx.fillRect(player.x, player.y - 12, hpBarWidth, 8);
                 }
                 ctx.lineWidth = '3px';
                 ctx.strokeRect(player.x, player.y - 12, player.width, 8);
@@ -642,10 +585,10 @@ function drawPlayers(gamePlayers) {
             }
             ctx.fillRect(player.x, player.y, player.width, player.height);
             ctx.fillStyle = 'black';
-            
+
             if (!player.isAlive) {
                 ctx.fillStyle = 'black';
-                ctx.fillText('DIE', player.x, player.y + 16);    
+                ctx.fillText('DIE', player.x, player.y + 16);
             }
         }
     }
@@ -654,14 +597,21 @@ function drawPlayers(gamePlayers) {
 function drawEnemies(gameEnemies) {
     if (gameEnemies.length !== 0) {
         for (const enemy of gameEnemies) {
-            const {x, y, width, height, hp, maxHp} = enemy;
+            const {
+                x,
+                y,
+                width,
+                height,
+                hp,
+                maxHp
+            } = enemy;
             if (enemy.isAlive) {
                 ctx.fillStyle = 'brown';
-                ctx.fillRect(x, y, width, height);    
-                
+                ctx.fillRect(x, y, width, height);
+
                 const hpPercent = convertNumberToPercent(hp, maxHp);
                 const hpWidth = enemy.width * hpPercent / 100;
-                
+
                 console.log(hpWidth);
                 ctx.fillStyle = '#4A2323';
                 ctx.fillRect(x, y - 10, width, 8);
@@ -671,7 +621,7 @@ function drawEnemies(gameEnemies) {
                 ctx.lineWidth = '0.3px';
                 ctx.strokeRect(x, y - 10, width, 8);
                 ctx.font = 'Monospace 10px';
-//                ctx.fillText(enemy.ammunition[0].allAmmunition, x, y - 20);
+                //                ctx.fillText(enemy.ammunition[0].allAmmunition, x, y - 20);
                 ctx.fillText(enemy.ammunition[0].actualAmmunition + ',' + enemy.ammunition[0].allAmmunition, x, y - 20);
             }
         }
@@ -681,14 +631,20 @@ function drawEnemies(gameEnemies) {
 function drawBlocks(gameBlocks) {
     if (gameBlocks.length !== 0) {
         for (const block of gameBlocks) {
-            const {x, y, width, height, type} = block;
+            const {
+                x,
+                y,
+                width,
+                height,
+                type
+            } = block;
             ctx.drawImage(solidObjectsSpritesheet, 64 * type, 0, 64, 64, x, y, width, height);
         }
     }
 }
 
 function updateUi() {
-    ctxUi.fillText('Shooting:'+mobileShootingCursor,50, 480);
+    ctxUi.fillText('Shooting:' + mobileShootingCursor, 50, 480);
     for (const chest of gameChests) {
         if (checkCollisionWith(myPlayer.hitbox, chest.hitbox)) {
             uiButtons.open.active = true;
@@ -714,7 +670,7 @@ function updateUi() {
     } else if (oldplayerHpWidthCounter <= playerHpWidthCounter && healthingPlayer) {
         oldplayerHpWidthCounter += 1.2;
     }*/
-    
+
 
 
     ctxUi.clearRect(0, 0, 1400, 920);
@@ -725,75 +681,83 @@ function updateUi() {
     if (myPlayer.hp > 0) {
         ctxUi.fillRect(15, 5, hpPercentWidth, 20);
     }*/
-    ctxUi.fillText('Aktualne zaklęcie:'+myPlayer.actualSpell,120, 550);
-    
+    ctxUi.fillText('Aktualne zaklęcie:' + myPlayer.actualSpell, 120, 550);
+
     //HP - Bar
     if (hpPercent > 85) {
         ctxUi.drawImage(hpBarFullImage, 15, 5);
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.hp + '/'+ myPlayer.maxHp, 15 + 158, 5 + 35);
+        ctxUi.fillText(myPlayer.hp + '/' + myPlayer.maxHp, 15 + 158, 5 + 35);
     } else if (hpPercent > 35) {
         ctxUi.drawImage(hpBarNearlyFullImage, 15, 5);
         ctxUi.fillStyle = 'blue';
         console.warn(hpPercentWidth);
         ctxUi.fillRect(15, 5, hpPercentWidth, 8);
-        
-        ctxUi.clearRect(15 + 254, 5+28 ,(width - hpPercentWidth) * -1 + 50, 22);
-        
+
+        ctxUi.clearRect(15 + 254, 5 + 28, (width - hpPercentWidth) * -1 + 50, 22);
+
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.hp + '/'+ myPlayer.maxHp, 15 + 158, 5 + 35);
-        
+        ctxUi.fillText(myPlayer.hp + '/' + myPlayer.maxHp, 15 + 158, 5 + 35);
+
     } else {
         ctxUi.drawImage(hpBarEmptyImage, 15, 5);
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.hp + '/'+ myPlayer.maxHp, 15 + 158, 5 + 35);
+        ctxUi.fillText(myPlayer.hp + '/' + myPlayer.maxHp, 15 + 158, 5 + 35);
     }
     //END HP - Bar
-    
+
     //MANA - Bar
     if (magicEnergyPercent > 85) {
         ctxUi.drawImage(hpBarFullImage, 15, 90);
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+        ctxUi.fillText(myPlayer.magicEnergy + '/' + myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
     } else if (magicEnergyPercent > 35) {
         ctxUi.drawImage(hpBarNearlyFullImage, 15, 90);
         ctxUi.fillStyle = 'blue';
         console.warn(magicEnergyPercentWidth);
-//        ctxUi.fillRect(15, 5, magicEnergyPercentWidth, 8);
-        
-        ctxUi.clearRect(15 + 254, 90+28 ,(width - magicEnergyPercentWidth) * -1 +90, 22);
-        
+        //        ctxUi.fillRect(15, 5, magicEnergyPercentWidth, 8);
+
+        ctxUi.clearRect(15 + 254, 90 + 28, (width - magicEnergyPercentWidth) * -1 + 90, 22);
+
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
-        
+        ctxUi.fillText(myPlayer.magicEnergy + '/' + myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+
     } else {
         ctxUi.drawImage(hpBarEmptyImage, 15, 90);
         ctxUi.fillStyle = 'black';
-        ctxUi.fillText(myPlayer.magicEnergy + '/'+ myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
+        ctxUi.fillText(myPlayer.magicEnergy + '/' + myPlayer.maxMagicEnergy, 15 + 158, 90 + 35);
     }
     //END MANA - Bar
-    
-//    ctxUi.clearRect(268, 32, hpPercentWidth, 22);
+
+    //    ctxUi.clearRect(268, 32, hpPercentWidth, 22);
     ctxUi.fillStyle = 'green';
     console.warn(hpPercent);
     ctxUi.fillRect(15, 5, hpPercentWidth, 8);
-    
-    
+
+
     if (myPlayer.spellsBuffer.reloadsTimes[0] !== undefined) {
-//        const loadProcess = 100 - convertNumberToPercent(myPlayer.spellsBuffer.reloadsTimes[0], myPlayer.actualSpell.reload[0] * 1000);
-//        const drawingProcess = 65 * loadProcess / 100;
+        //        const loadProcess = 100 - convertNumberToPercent(myPlayer.spellsBuffer.reloadsTimes[0], myPlayer.actualSpell.reload[0] * 1000);
+        //        const drawingProcess = 65 * loadProcess / 100;
 
-//        ctxUi.fillRect(850, 120, drawingProcess, 65);
+        //        ctxUi.fillRect(850, 120, drawingProcess, 65);
         ctxUi.fillStyle = 'red';
-        ctxUi.fillText(myPlayer.spellsBuffer.reloadsTimes[0],125, 570);
+        ctxUi.fillText(myPlayer.spellsBuffer.reloadsTimes[0], 125, 570);
     }
-    
-//    ctxUi.fillStyle = 'red';
-//    ctxUi.fillRect(15, 0, -35, 8);
 
-    const {name, type} = myPlayer.weapon;
-    const {actualAmmunition, maxMagazine, reloading, allAmmunition} = myPlayer.ammunition[0];
-    
+    //    ctxUi.fillStyle = 'red';
+    //    ctxUi.fillRect(15, 0, -35, 8);
+
+    const {
+        name,
+        type
+    } = myPlayer.weapon;
+    const {
+        actualAmmunition,
+        maxMagazine,
+        reloading,
+        allAmmunition
+    } = myPlayer.ammunition[0];
+
     ctxUi.font = '20px Monospace';
     ctxUi.fillStyle = 'black';
     /*ctxUi.fillText('You:' + myPlayer.name, 15, 45);

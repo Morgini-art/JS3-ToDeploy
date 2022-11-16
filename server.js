@@ -18,6 +18,8 @@ const SpellsBuffer = SpellFile.SpellsBuffer;
 const renewMagicEnergy = SpellFile.renewMagicEnergy;
 const Invetory = InvetoryFile.Invetory;
 const Slot = InvetoryFile.Slot;
+const Recipe = InvetoryFile.Recipe;
+const createItemsFromRecipe = InvetoryFile.createItemsFromRecipe;
 const fillInvetoryWithSlots = InvetoryFile.fillInvetoryWithSlots;
 const Item = InvetoryFile.Item;
 const Block = BlockFile.Block;
@@ -59,9 +61,8 @@ for (const name of Object.keys(nets)) {
 }
 console.log(results);
 
-server.listen(process.env.PORT, () => {
-    console.log('Server start on: localhost');
-    writeToLog('Server start');
+server.listen(16450,'0.0.0.0', () => {
+    console.log('Server start');
 });
 
 function onErr(err) {
@@ -220,17 +221,23 @@ const GameObjects = {
     blocks: []
 };
 
-
-//    const y = 800;
-//const x = 1500;
-
 const items = [
     new Item('Test01',3,0,'test01',false),
-    new Item('Test02',7,0,'test02',false)
+    new Item('Test02',7,0,'test02',false),
+    new Item('Żelazo',7,0,'Żelazo',false),
+    new Item('Drewno',7,0,'Drewno',false),
+    new Item('Mały miecz',7,0,'weapon',false)
 ];
 
-GameObjects.chests.push(new Chest(1500, 800, 25, 25, new Hitbox(1500, 800, 25, 25), structuredClone(items[0])));
+const recipes = [
+    new Recipe('Mały miecz', [{item: items[2], amount: 1}, {item: items[3], amount: 1}], [{item: items[4], amount: 1}], 0)
+];
 
+console.log(recipes);
+
+GameObjects.chests.push(new Chest(1500, 800, 25, 25, new Hitbox(1500, 800, 25, 25), structuredClone(items[2])));
+
+GameObjects.chests[0].content.amount = 1;
 
 const weapons = [
     new Weapon('Pistolet', 1, 3, 1, 20, 20, 'distance', 3, structuredClone(ammunitions[0]), 90),
@@ -314,7 +321,7 @@ function updateGameState () {
             counter++;
         }
     }
-    if (countOfPlayers >= 2 && counter >= 2) {
+    if (countOfPlayers >= 1 && counter >= 1) {
         gameState = 'play';
         io.emit('send-game-state', 'play');
     } else {
@@ -324,8 +331,118 @@ function updateGameState () {
     }   
 }
 
+/*socket.on('client-version', clientVersion => {
+        if (Version.version === clientVersion) {
+
+        } else {
+            socket.emit('send-alert', 'Sorry but your version' + clientVersion + 'is not actually. Please update and come back.');
+            let idOfUser;
+            console.log('User close. User ID:' + socket.id + '.');
+            gamePlayers.forEach((player, i) => {
+                if (socket.id === player.id) {
+                    idOfUser = i;
+                    console.log('User close. User in array:' + i + '.');
+                }
+            });
+
+            whereToGo = idOfUser;
+
+            gamePlayers.splice(idOfUser, 1);
+            players.splice(idOfUser, 1);
+            countOfPlayers--;
+            whereToGo--;
+            
+            socket.emit('close');            
+        }
+    });*/
+
+function clientVersionIsGood(socket) {
+    socket.emit('get-version', (ok=false,reponse)=>{
+        console.warn(ok);
+        console.log('We must',reponse);
+        if (isUndefined(reponse)) {
+            console.error('DA');
+        }
+        /*if (Version.version === clientVersion) {
+        return true;
+    } else {
+        socket.emit('send-alert', 'Sorry but your version' + clientVersion + 'is not actually. Please update and come back.');
+        socket.emit('delete-connection');
+        return false;
+    }*/
+    });
+}   
+
 
 io.on('connection', (socket) => {
+    writeToLog('User with id:'+socket.id+' connect with server.');
+    
+    io.emit('send-info', 'Other players:' + countOfPlayers);
+    const status = {
+        host:  socket.handshake.headers.host,
+        state: 'connected'
+    };
+    io.emit('send-status-server', status);
+    
+    setInterval(updateGameState, 1000);
+        
+    writeToLog('User with id:'+socket.id+' connect with server.');
+    
+    /*socket.on('enter-to-game', data => {
+        console.log(data);
+        for (const player of gamePlayers) {
+            if (socket.id === player.id) {
+                console.log(socket.id, player);
+                player.state = data.state;
+                player.name = data.name;
+                console.log(socket.id, player);
+                
+                if (countOfPlayers < 2) {
+                    //socket.emit('send-alert', 'Waiting for more players. Required minimum two players with active status');
+                }
+            }
+        }
+    });*/
+    
+    socket.on('enter-to-game', data => {
+        writeToLog('User with id:'+data.name+' go to game.');
+
+        
+        writeToLog('Checking client version...');
+//        const next = clientVersionIsGood(socket); TODO: Check client version
+        
+        const x = 1500;
+        const y = 800;
+        const newWeapon = new Weapon('Sztylet', 8, 14, 1, 80, 15, 'melee', 2);
+        const newInvetory = new Invetory();
+        const newSpellsBuffer = new SpellsBuffer();
+        newInvetory.basicSlots.length = 30;
+        fillInvetoryWithSlots(newInvetory);
+        
+        /*const items = [
+    new Item('Test01',3,0,'test01',false),
+    new Item('Test02',7,0,'test02',false),
+    new Item('Żelazo',7,0,'Żelazo',false),
+    new Item('Drewno',7,0,'Drewno',false),
+    new Item('Mały miecz',7,0,'weapon',false)
+];*/
+        newInvetory.basicSlots[0].content = items[2];
+        newInvetory.basicSlots[1].content = items[3];
+        newInvetory.basicSlots[0].amount = 3;
+        newInvetory.basicSlots[1].amount = 2;
+        const newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 250, 280, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells), structuredClone(recipes));
+        newPlayer.state = data.state;
+        newPlayer.name = data.name;
+        //    const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])]);
+        newPlayer.ammunition[0].allAmmunition = 15;
+        players.push(newPlayer);
+        gamePlayers.push(players[whereToGo]);
+        socket.emit('assign-player', players[whereToGo]);
+
+        countOfPlayers++;
+        whereToGo++;
+    });
+    
     socket.on('client-version', clientVersion => {
         /*if (Version.version === clientVersion) {
 
@@ -350,41 +467,6 @@ io.on('connection', (socket) => {
             socket.emit('close');            
         }*/
     });
-    writeToLog('User with id:'+socket.id+' connect with server.');
-    io.emit('send-info', 'Other players:' + countOfPlayers);
-    const status = {
-        host:  socket.handshake.headers.host,
-        state: 'connected'
-    };
-    io.emit('send-status-server', status);
-
-    
-    const x = 1500;
-    const y = 800;
-    const newWeapon = new Weapon('Sztylet', 8, 14, 1, 80, 15, 'melee', 2);
-    const newInvetory = new Invetory();
-    const newSpellsBuffer = new SpellsBuffer();
-    newInvetory.basicSlots.length = 30;
-    fillInvetoryWithSlots(newInvetory);
-    newInvetory.basicSlots[0].content = items[0];
-    newInvetory.basicSlots[2].content = items[1];
-    const newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 250, 280, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells));
-    //    const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])]);
-    newPlayer.ammunition[0].allAmmunition = 15;
-    players.push(newPlayer);
-    gamePlayers.push(players[whereToGo]);
-    socket.emit('assign-player', players[whereToGo]);
-
-    countOfPlayers++;
-    whereToGo++;
-    
-    
-    /*console.log('-----------------------');
-    console.log(players);
-    console.log('-----------------------');*/
-
-    
-    setInterval(updateGameState, 1000);
 
     socket.on('set-player-move-target', data => {
         for (const player of gamePlayers) {
@@ -550,21 +632,7 @@ io.on('connection', (socket) => {
          }
      });*/
 
-    socket.on('enter-to-game', data => {
-        console.log(data);
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                console.log(socket.id, player);
-                player.state = data.state;
-                player.name = data.name;
-                console.log(socket.id, player);
-                
-                if (countOfPlayers < 2) {
-                    //socket.emit('send-alert', 'Waiting for more players. Required minimum two players with active status');
-                }
-            }
-        }
-    });
+    
     
     socket.on('player-open-chest', data => {
         for (const player of gamePlayers) {
@@ -693,7 +761,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', function () {
-        let idOfUser;
+        let idOfUser = -1;
         console.log('User close. User ID:' + socket.id + '.');
         gamePlayers.forEach((player, i) => {
             if (socket.id === player.id) {
@@ -702,18 +770,21 @@ io.on('connection', (socket) => {
             }
         });
         
-        whereToGo = idOfUser;
+        if (!idOfUser === -1) {
+            whereToGo = idOfUser;
 
-        gamePlayers.splice(idOfUser, 1);
-        players.splice(idOfUser, 1);
-        countOfPlayers--;
-        io.emit('send-info', 'Other players:' + countOfPlayers);
-        console.log('-----------------------');
-        console.log(idOfUser);
-        console.log(players);
-        console.log(gamePlayers);
-        console.log('-----------------------');
-        writeToLog('User with id:'+socket.id+' disconnect with server.');
+            gamePlayers.splice(idOfUser, 1);
+            players.splice(idOfUser, 1);
+            countOfPlayers--;
+            io.emit('send-info', 'Other players:' + countOfPlayers);
+            console.log('-----------------------');
+            console.log(idOfUser);
+            console.log(players);
+            console.log(gamePlayers);
+            console.log('-----------------------');
+            writeToLog('User with id:' + socket.id + ' disconnect with server.');
+        }
+        
     });
 });
 

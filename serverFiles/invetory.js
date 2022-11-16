@@ -31,6 +31,19 @@ class Invetory{
     }
 }
 
+class Recipe {
+    constructor(name, ingredients, products, cost) {
+        this.name = name;
+        this.ingredients = ingredients;
+        this.products = products;
+        this.cost = cost;
+    }
+}
+
+function createItemsFromRecipe(recipe, invetory) {
+    
+}
+
 class Item {
     constructor(name, price, type, rarity, effect, toBuyInShop) {
         this.itemName = name;
@@ -43,11 +56,12 @@ class Item {
 }
 
 class Slot {
-    constructor(id, content = 'empty',x , y) {
+    constructor(id, content = 'empty',x , y, amount) {
         this.id = id;
         this.content = content;
         this.x = x;
         this.y = y;
+        this.amount = amount;
     }
 }
 
@@ -56,7 +70,7 @@ function fillInvetoryWithSlots(invetoryObject) {
     let row = 0;
     
 	for (let i = 0; i < invetoryObject.basicSlots.length; i++) {
-		invetoryObject.basicSlots[i] = new Slot(i, 'empty',50 + 87 * row, 50 + 87 * collumn);
+		invetoryObject.basicSlots[i] = new Slot(i, 'empty',50 + 87 * row, 50 + 87 * collumn, 0);
         
         row++;
         
@@ -72,4 +86,4 @@ function fillInvetoryWithSlots(invetoryObject) {
     Slot map : 6x4 (20 slots)*/
 }
 
-module.exports = {Slot, fillInvetoryWithSlots, Invetory, Item};
+module.exports = {Slot, fillInvetoryWithSlots, Invetory, Item, Recipe, createItemsFromRecipe};

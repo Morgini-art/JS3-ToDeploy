@@ -16,16 +16,22 @@ class Spell {
             availablesObjects,
             requiredMagicEnergy,
             name,
-            reload
+            reload,
+            action
         } = this;
         
+        console.log('Loading bewitching for spell:',this.name, 'Player:',thrower.name, '(',thrower.id,')');
+        
         if (thrower.magicEnergy >= requiredMagicEnergy) {
+            console.log('MANA: OK');
             const lenght = spellsBuffer.spells.length;
             for (let x = 0; x < lenght; x++) {
-                if (spellsBuffer.spells[x] === name) {
+                if (spellsBuffer.spells[x] === action) {
+                    console.log('RELOAD: NO');
                     return 'moving';   
                 }
             }
+            console.log('RELOAD: OK');
             if (typeOfThrower === 'player') {
                 return 'marking';
                 if (availablesObjects.substr(0, 5) === 'enemy' && cursorMode !== 'marking') {
@@ -40,6 +46,8 @@ class Spell {
                     return 'moving';
                 }
             }
+        } else {
+            console.log('MANA: NO');
         }
     }
     

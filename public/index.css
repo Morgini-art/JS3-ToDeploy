@@ -1,61 +1,13 @@
 body {
     margin: 0;
-    font-family: Monospace;
     background-color: #435a69;
+    font-family: Monospace;
+    text-align: center;
 }
 
 h1 {
-    text-align: center;
     font-size: 35px;
     color: #89bad9;
-}
-
-#game {
-    background-color: #2d5266;
-}
-
-#game-window {
-    display: grid;
-    width:  1400px;
-    height:  920px;
-    margin:  auto;
-    display: none;
-}
-
-#game {
-    margin: 0;
-}
-
-#game-ui, #click-handler, #dirty-game {
-    grid-column: 1;
-    grid-row: 1;
-    border: 1px solid black;
-    overflow: hidden;
-}
-
-.info {
-    text-align: center;
-    font-size: 25px;
-}
-
-#classic-text {
-    font-size: 32px;        
-}
-
-/*#game-canvas {
-    display: inherit;
-}*/
-
-#menu {
-    text-align: center;
-    color: #89bad9;
-    background-color: #2d5266;
-    border-radius: 4px;
-    padding: 12px ;
-    margin: 0 auto;
-    width: 265px;
-    height: 250px;
-    display: block;
 }
 
 input[type='text'] {
@@ -72,6 +24,52 @@ input[type='text'] {
     color: #89bad9;
 }
 
+input[type='text']:focus {
+    transition: 1s;
+    background-color: #89bad9;
+    border: none;
+    color: #102c40;
+    outline: none;
+}
+
+.info {
+    text-align: center;
+    font-size: 25px;
+}
+
+.game-canvas {
+    display: none;
+}
+
+#game {
+    background-color: #2d5266;
+}
+
+#game-window {
+    display: grid;
+    width: 1400px;
+    height: 920px;
+    margin: auto;
+    display: none;
+}
+
+#game {
+    margin: 0;
+}
+
+#game-ui,
+#click-handler,
+#dirty-game {
+    grid-column: 1;
+    grid-row: 1;
+    border: 1px solid black;
+    overflow: hidden;
+}
+
+#classic-text {
+    font-size: 32px;
+}
+
 #player-mode {
     width: 100%;
     text-align: center;
@@ -83,12 +81,16 @@ input[type='text'] {
     border-radius: 4px;
 }
 
-input[type='text']:focus {
-    transition: 1s;
-    background-color: #89bad9;
-    border: none;
-    color: #102c40;
-    outline: none;
+#menu {
+    text-align: center;
+    color: #89bad9;
+    background-color: #2d5266;
+    border-radius: 4px;
+    padding: 12px;
+    margin: 0 auto;
+    width: 265px;
+    height: 250px;
+    display: block;
 }
 
 #start-game {
@@ -106,39 +108,4 @@ input[type='text']:focus {
     transition: 1s;
     color: #102c40;
     background-color: #89bad9;
-}
-
-.game-canvas {
-    display: none;
-/*    margin: 0 auto;*/
-}
-
-@media screen and (orientation:portrait) {
-    #menu {
-        width: 92%;
-        height: 350px;
-        font-size: 45px;
-    }
-    
-    #classic-text {
-        font-size: 45px;
-    }
-    
-    input[type='text'] {
-        font-size: 45px;
-        height: 60px;
-    }
-    
-    h1 {
-        font-size: 55px;
-    }
-    
-    p.info {
-        font-size: 38px;
-    }
-    
-    #start-game {
-        font-size: 45px;
-        height: 100px;   
-    }
 }

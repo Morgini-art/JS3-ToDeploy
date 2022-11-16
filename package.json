@@ -1,24 +1,25 @@
 {
-    "name": "server",
-    "version": "1.0.0",
-    "description": "",
-    "main": "",
-    "bin": "",
-    "scripts": {
-        "start": "node server.js"
-    },
-    "author": "",
-    "license": "ISC",
-    "devDependencies": {
-        "nodemon": "^2.0.19"
-    },
-    "dependencies": {
-        "express": "^4.18.1",
-        "node-os-utils": "^1.3.7",
-        "pkg": "^5.8.0",
-        "pm2": "^5.2.2",
-        "prompt": "^1.3.0",
-        "socket.io": "^4.5.3",
-        "update-notifier": "^6.0.2"
-    }
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "bin":"server.js",
+  "scripts": {
+    "run": "nodemon server.js",
+    "compile": "pkg server.js -t node18-win-x64 -o output/server.exe",
+    "compile-linux": "pkg server.js -t node18-linux-x64"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^2.0.19"
+  },
+  "dependencies": {
+    "express": "^4.18.1",
+    "socket.io": "^4.5.2",
+    "node-os-utils": "^1.3.7",
+    "pkg": "^5.8.0",
+    "prompt": "^1.3.0",
+    "update-notifier": "^6.0.2"
+  }
 }

@@ -1,0 +1,1 @@
+npx pkg server.js -t node18-win-x64 -o output/server.exe

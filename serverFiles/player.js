@@ -2,7 +2,7 @@ const CreatureFile = require('./creature.js');
 const Creature = CreatureFile.Creature;
 
 class Player extends Creature {
-    constructor(id, name, treaty, x, y, width, height, hitbox, weapon, hp, maxHp, movingSpeed, magicEnergy, maxMagicEnergy, ammunition, invetory, spellsBuffer, spells) {
+    constructor(id, name, treaty, x, y, width, height, hitbox, weapon, hp, maxHp, movingSpeed, magicEnergy, maxMagicEnergy, ammunition, invetory, spellsBuffer, spells, recipes) {
         super(x, y, width, height, hitbox, weapon, hp , maxHp,movingSpeed);
         this.id = id;
         this.name = name;
@@ -21,6 +21,7 @@ class Player extends Creature {
         this.maxMagicEnergy = maxMagicEnergy;
         this.loaderMagicEnergy = 0;
         this.weaponCounter = 0;
+        this.spellCounter = 0;
         this.fightActions = {};
         this.toBlock;
         this.block = false;
@@ -28,6 +29,7 @@ class Player extends Creature {
         this.spellsBuffer = spellsBuffer;
         this.actualSpell = spells[0].name;
         this.spells = spells;
+        this.recipes = recipes;
     }
 
     drawPlayer(ctx) {
