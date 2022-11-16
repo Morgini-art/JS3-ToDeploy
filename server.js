@@ -61,7 +61,7 @@ for (const name of Object.keys(nets)) {
 }
 console.log(results);
 
-server.listen(16450,'0.0.0.0', () => {
+server.listen(process.env.PORT, () => {
     console.log('Server start');
 });
 
