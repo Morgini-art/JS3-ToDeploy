@@ -4,9 +4,7 @@
     "description": "",
     "main": "server.js",
     "bin": "server.js",
-    "scripts": {
-        "web": "node server.js"
-    },
+    "web": "node server.js",
     "license": "ISC",
     "devDependencies": {
         "nodemon": "^2.0.19"
