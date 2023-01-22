@@ -1,77 +1,99 @@
-const express = require('express');
-const playerFile = require('./serverFiles/player');
-const timeFile = require('./serverFiles/time');
-const Player = playerFile.Player;
-const Weapon = require('./serverFiles/weapon').Weapon;
-const Ammunition = require('./serverFiles/weapon').Ammunition;
+const {Invetory,Slot,Recipe,createItemsFromRecipe,fillInvetoryWithSlots,addItem,Item} = require('./serverFiles/invetory');
+const {User,allUsers,findUser,updateUser,createUser,deleteUser,convertObject} = require('./serverFiles/database');
+const {Bullet,checkTheDirectionOfTheBullet,moveBullet} = require('./serverFiles/bullet');
+const {Enemy, choosePlayer, enemyAi, fieldOfView} = require('./serverFiles/enemy');
+const {Block,createBlock,createBlocksWithGrid} = require('./serverFiles/block');
+const {Spell,SpellsBuffer,renewMagicEnergy} = require('./serverFiles/spell');
+const {GameMap,Chunk,generatePlane,loadMap} = require('./serverFiles/map');
+const {Weapon,attackWeapon,Ammunition} = require('./serverFiles/weapon');
+const {Hitbox,checkCollisionWith} = require('./serverFiles/hitbox');
+const {Timer,Tick,clearTimerCache} = require('./serverFiles/time');
 const interpeter = require('./serverFiles/text').interpeter;
-const Bullet = require('./serverFiles/bullet').Bullet;
-const Chest = require('./serverFiles/chest').Chest;
-const Hitbox = require('./serverFiles/hitbox').Hitbox;
-const Enemy = require('./serverFiles/enemy').Enemy;
-const mapFile = require('./serverFiles/map');
-const BlockFile = require('./serverFiles/block');
-const InvetoryFile = require('./serverFiles/invetory');
-const SpellFile = require('./serverFiles/spell');
-const Spell = SpellFile.Spell;
-const SpellsBuffer = SpellFile.SpellsBuffer;
-const renewMagicEnergy = SpellFile.renewMagicEnergy;
-const Invetory = InvetoryFile.Invetory;
-const Slot = InvetoryFile.Slot;
-const Recipe = InvetoryFile.Recipe;
-const createItemsFromRecipe = InvetoryFile.createItemsFromRecipe;
-const fillInvetoryWithSlots = InvetoryFile.fillInvetoryWithSlots;
-const Item = InvetoryFile.Item;
-const Block = BlockFile.Block;
-const createBlock = BlockFile.createBlock;
-const createBlocksWithGrid = BlockFile.createBlocksWithGrid;
-const checkCollisionWith = require('./serverFiles/hitbox').checkCollisionWith;
-const Timer = timeFile.Timer;
-const Tick = timeFile.Tick;
-const clearTimerCache = timeFile.clearTimerCache;
-const timeLoop = timeFile.timeLoop;
-const GameMap = mapFile.GameMap;
-const Chunk = mapFile.Chunk;
-const generatePlane = mapFile.generatePlane;
-const loadMap = mapFile.loadMap;
-const app = express();
-const http = require('http');
-const server = http.createServer(app);
-const fs = require('fs');
-const { networkInterfaces } = require('os');
-
+const {Quest,Npc,Dialogue} = require('./serverFiles/quest');
+const {Chest,openChest} = require('./serverFiles/chest');
+const {Player, attack} = require('./serverFiles/player');
 const Version = require('./version');
 
-console.log('Server version:',Version.version);
-console.log('Compabityle with:',Version.accessWith);
-
-const nets = networkInterfaces();
-const results = Object.create(null);
-
-for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-        const familyV4Value = typeof net.family === 'string' ? 'IPv4' : 4
-        if (net.family === familyV4Value && !net.internal) {
-            if (!results[name]) {
-                results[name] = [];
-            }
-            results[name].push(net.address);
-        }
-    }
-}
-console.log(results);
-
-server.listen(process.env.PORT, () => {
-    console.log('Server start');
-});
-
-function onErr(err) {
-    console.log(err);
-    return 1;
-}
-
+//MAIN IMPORTS
+const express = require('express');
+const mongoose = require('mongoose');
+const app = express();
+const adminApp = express();
+const http = require('http');
+const fs = require('fs');
+const { networkInterfaces } = require('os');
+const os = require('os');
 const {Server} = require('socket.io');
+
+let serverConfig = JSON.parse(fs.readFileSync('config.json', 'utf-8'));
+console.log(`...JS3RebulidMultiplayer Server...`);
+console.log(`...Server version:${Version.version}...`);
+console.log(`...NodeJs Version:${process.version}...`);
+console.log('...Compabityle with:',Version.accessWith,'...');
+console.log(`...Configuration...\nIp:${serverConfig.ip}\nPort:${serverConfig.port}\nPassword:${serverConfig.password}\nAdminPanel:${serverConfig.adminpanel}\n...`);
+
+//ADMIN SERVER
+let adminServer = 'off', adminIo = 'off', adminPanelOn = false;
+
+if (serverConfig.adminpanel) {
+    adminPanelOn = true;
+    adminServer = http.createServer(adminApp);
+    adminServer.listen(process.env.PORT+32, () => {
+        console.log(`^^Admin Server start ${serverConfig.ip}:${process.env.PORT+32}^^`);
+    });
+    adminIo = new Server(adminServer,{ transports: ['websocket'] });
+    /*adminApp.get('/', (req, res) => {
+        console.log('Ax');
+        res.sendFile('index.html', {
+            root: '\admin'
+        });
+    });*/
+    adminApp.get('/watch/:objectId', (req, res) => {
+        res.sendFile('watch.html', {
+            root: '\watch'
+        });
+    });
+    /*adminApp.get('/watch/:objectId', (req, res) => {
+        res.sendFile('watch.html', {
+            root: '\watch'
+        });
+    });*/
+    /*adminApp.get('/watch/:object/socket-lib', (req, res) => {
+        console.log('URK');
+        res.sendFile('admin/socket.io-lib\socket.io\client-dist\socket.io.min.js', {
+            root: 'admin/socket.io-lib\socket.io\client-dist'
+        });
+    });*/
+    /*adminApp.get('/watch/:object/socket-lib', (req, res) => {
+        res.sendFile('watch.html', {
+            root: '../admin'
+        });
+    });*/
+//    watch/Enemy~0
+    
+    adminApp.use(express.static('admin'));
+//    adminIo.set('transports', ['websocket']);
+}
+
+//END - ADMIN SERVER
+//CLIENT SERVER
+const server = http.createServer(app);
+server.listen(process.env.PORT, () => {
+    console.log(`^^Client Server start ${serverConfig.ip}:${process.env.PORT}^^`);
+});
 const io = new Server(server);
+app.get('/', (req, res) => {
+    res.sendFile('index.html', {
+        root: '\public'
+    });
+});
+app.use(express.static('public'));
+//END CLIENT SERVER
+
+//DATABASE CONNECTION
+const databaseUrl = 'mongodb+srv://HerokuJS3:518N6Byan4HRPbLF@js3.4114ia6.mongodb.net/Main';
+console.log(`^^Connecting MongoDB to ${databaseUrl}^^`);
+mongoose.connect(databaseUrl);
 
 const house01TileObject = [8, 12, 12, 12, 12, 9,
             10, 12, 12, 12, 12, 11,
@@ -90,108 +112,6 @@ const house02TileObject = [0, 0, 8, 12, 12, 12, 12, 9, 0, 0,
             3, 7, 4, 4, 7, 4, 4, 4, 7, 5,
             3, 4, 7, 4, 4, 4, 7, 4, 7, 5,
             3, 3, 1, 3, 6, 6, 5, 2, 4, 5];
-
-const mapFirstLayer = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-            5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5];
-
-const mapSecondLayer = [37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            39, 40, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0,
-            43, 44, 0, 0, 46, 48, 0, 0, 0, 48, 0, 0, 46, 0, 48, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 48, 0, 0, 0, 48, 41, 42, 46, 0, 48, 0, 0, 0, 0, 0, 0, 28, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 0, 28, 43, 44, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 46, 0, 0, 28, 0, 0, 0, 0, 0,
-            48, 0, 0, 0, 37, 38, 36, 48, 0, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33,
-            0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 33, 0, 0, 16, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 36, 0, 0, 49, 0, 39, 40, 0, 0, 0, 0, 48, 0, 0, 48, 0, 0, 36, 0, 0, 49, 0, 0, 0,
-            0, 0, 0, 25, 41, 42, 0, 0, 37, 38, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 16, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 43, 44, 0, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0, 37, 38, 0, 43, 44, 0, 0, 46, 0, 0, 0, 0, 25, 0, 0, 0, 0, 37, 38, 0, 0, 0,
-            0, 0, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0, 0, 0, 33, 0, 0, 0, 39, 40, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 39, 40, 0, 0, 0,
-            0, 0, 0, 0, 48, 0, 0, 0, 43, 44, 36, 0, 0, 49, 0, 0, 0, 0, 0, 0, 41, 42, 0, 49, 0, 0, 41, 42, 0, 48, 25, 0, 0, 0, 0, 36, 0, 0, 49, 0, 49, 0, 0, 41, 42, 0, 0, 25,
-            0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 0, 43, 44, 0, 0, 0, 0, 43, 44, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 43, 44, 0, 0, 0,
-            48, 0, 0, 0, 0, 0, 0, 25, 14, 0, 0, 0, 37, 38, 0, 0, 39, 40, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 25, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 41, 42, 48, 0, 0, 37, 38, 0, 0, 0, 14, 0, 0, 41, 42, 0, 0, 0, 0, 48, 0, 39, 40, 0, 0, 0, 0, 14, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 43, 44, 0, 0, 0, 39, 40, 0, 37, 38, 37, 38, 0, 43, 44, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0, 37, 38, 0, 0, 0,
-            0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 39, 40, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 39, 40, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 48, 0, 0, 0, 43, 44, 0, 41, 42, 41, 42, 0, 0, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0,
-            0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 14, 5, 0, 39, 40, 0, 0, 37, 38, 0, 0, 0, 43, 44, 43, 44, 0, 28, 0, 39, 40, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0,
-            0, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0, 0, 0, 37, 38, 41, 42, 37, 38, 39, 40, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 37, 38, 39, 40, 43, 44, 39, 40, 41, 42, 0, 39, 40, 0, 48, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 0, 0,
-            0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 39, 40, 41, 42, 37, 38, 41, 42, 43, 44, 0, 41, 42, 0, 37, 38, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0,
-            0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 41, 42, 43, 44, 39, 40, 43, 44, 0, 46, 0, 43, 44, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 41, 42, 0, 0, 37, 38, 0, 0, 0, 0, 41, 42, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 0, 0, 43, 44, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 39, 40, 0, 36, 0, 0, 43, 44, 0, 0, 0, 37, 38, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 16, 39, 40, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 37, 38, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 37, 38, 0, 0, 0, 37, 38, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0, 48, 0, 0, 0, 48, 0, 0, 46, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 33, 0, 0, 39, 40, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 48, 0, 0, 0, 48, 0, 0, 41, 42, 48, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 48, 43, 44, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 48, 0, 0, 46, 43, 48, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 48, 0, 0, 0, 0, 0, 0, 46, 0, 48, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 46, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 37, 38, 0, 48, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 48, 0, 0, 49, 48, 0, 0, 46, 0, 48, 0, 0, 0,
-            37, 38, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 0, 0, 39, 40, 0, 0, 0, 0, 33, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 28,
-            39, 40, 0, 0, 48, 0, 33, 0, 0, 48, 36, 0, 0, 49, 0, 0, 0, 0, 0, 0, 41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 25, 0, 37, 38, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            41, 42, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 0, 0, 0, 0, 0, 16, 0, 0, 43, 44, 0, 0, 46, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 39, 40, 0, 33, 0, 0, 48, 0, 0, 0, 0,
-            43, 44, 0, 0, 46, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0, 41, 42, 0, 41, 42, 0, 0, 25, 0, 0, 0, 28, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 36, 33, 0, 49, 0, 0, 0, 0, 43, 44, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            48, 0, 0, 0, 0, 0, 36, 0, 0, 49, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 0,
-            0, 0, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0, 48, 0, 0, 14, 0, 0, 36, 0, 0, 49, 0, 0, 0, 0,
-            0, 0, 0, 25, 0, 0, 25, 0, 37, 38, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16,
-            0, 0, 0, 0, 48, 0, 0, 0, 39, 40, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0, 0, 0, 0, 25, 0, 0, 0, 0, 37, 38, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 39, 40, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 0, 0, 41, 42, 0, 0, 25, 0,
-            0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 43, 44, 0, 0, 0, 0,
-            48, 0, 0, 0, 0, 0, 0, 0, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-
-console.log('Environment');
-console.log('NodeJs Version: ' + process.version);
-console.log('Version: ' + process.env.npm_package_version);
 
 let gameAttackList = [];
 
@@ -230,10 +150,24 @@ const items = [
 ];
 
 const recipes = [
-    new Recipe('Mały miecz', [{item: items[2], amount: 1}, {item: items[3], amount: 1}], [{item: items[4], amount: 1}], 0)
+    new Recipe('Mały miecz', [{item: items[2], amount: 1}, {item: items[3], amount: 1}], [{item: items[4], amount: 1}], 0),
+    new Recipe('Mały miecz 232145', [{item: items[2], amount: 3}, {item: items[3], amount: 4}], [{item: items[4], amount: 2}], 0)
 ];
 
-console.log(recipes);
+const npcs = [
+    new Npc(0, 1500, 750, 50, 65, new Hitbox(1500, 750, 50, 65), [
+        new Dialogue('0', 'Hi!', false)
+    ])
+];
+
+const dialogues = [
+    new Dialogue('0', 'Hi!', false)
+];
+
+const quests = [
+    new Quest('Give me one: "Mały miecz"', 0, [], [npcs[0]])
+];
+
 
 GameObjects.chests.push(new Chest(1500, 800, 25, 25, new Hitbox(1500, 800, 25, 25), structuredClone(items[2])));
 
@@ -243,7 +177,7 @@ const weapons = [
     new Weapon('Pistolet', 1, 3, 1, 20, 20, 'distance', 3, structuredClone(ammunitions[0]), 90),
     new Weapon('Młot', 24, 34, 1, 20, 350, 'melee'),
     new Weapon('Mały Miecz', 6, 13, 1, 20, 240, 'melee'),
-    new Weapon('Kusza', 9, 14, 1, 20, 20, 'distance', 2, structuredClone(ammunitions[1]), 80)
+    new Weapon('Kusza', 9, 14, 1, 20, 20, 'distance', 2, structuredClone(ammunitions[1]), 800)
 ];
 
 const spells = [
@@ -256,11 +190,11 @@ const spells = [
 //const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])],);
 //player1.ammunition[0].allAmmunition = 15;
 
-GameObjects.enemies.push(new Enemy(0, 450, 80, 50, 65, 40, 40, weapons[3], new Hitbox(undefined, undefined, 50, 65), 1, 1, structuredClone(items[1]), 1, 0, [structuredClone(ammunitions[1])]));
-console.log(GameObjects.enemies[0]);
+//GameObjects.enemies.push(new Enemy(0, 1565, 610, 50, 65, 40, 40, weapons[3], new Hitbox(undefined, undefined, 50, 65), 1, 1, structuredClone(items[1]), 1, 0, [structuredClone(ammunitions[1])]));
 
-GameObjects.enemies[0].secondAiState = 'icanshoot?';
-GameObjects.enemies[0].ammunition[0].allAmmunition = 15;
+//GameObjects.enemies[0].secondAiState = 'icanshoot?';
+//GameObjects.enemies[0].aiState = 'whereplayer';
+//GameObjects.enemies[0].ammunition[0].allAmmunition = 15;
 
 
 createBlocksWithGrid(800, 50, 64, 64, house02TileObject, 10, 8, GameObjects);
@@ -271,17 +205,7 @@ createBlocksWithGrid(2570, 90, 64, 64, house02TileObject, 10, 8, GameObjects);
 
 
 generatePlane(3, GameObjects.map, 1024, 1024);
-loadMap(GameObjects.map, 3, mapFirstLayer, mapSecondLayer, GameObjects);
-/*
-console.group();
-console.log('Test Objects:');
-console.log('Enemy:' , GameObjects.enemies[0]);
-//console.log('Him weapon:' , newWeapon);
-//console.log('Ammo to weapon:' , newWeapon.requiredAmmunition);
-//console.log('Player ammo:' , player1.ammunition);
-console.groupEnd();*/
-
-//console.log(weapons[0]);
+//loadMap(GameObjects.map, 3, mapFirstLayer, mapSecondLayer, GameObjects);
 
 GameObjects.chests.push(new Chest(2200, 2200, 25, 25, new Hitbox(2200, 2200, 25, 25), 'nothing', 'chest'));
 
@@ -295,12 +219,6 @@ const maxCountOfPlayers = 2;
 
 let whereToGo = 0;
 
-app.get('/', (req, res) => {
-    res.sendFile('index.html', {
-        root: '\public'
-    });
-});
-
 function writeToLog(text) {
     const dateObject = new Date();
     const date = 'Day:'+dateObject.getDate()+'-'+dateObject.getHours()+':'+dateObject.getMinutes()+':'+dateObject.getSeconds();
@@ -311,8 +229,6 @@ function writeToLog(text) {
         }
     });
 }
-
-app.use(express.static('public'));
 
 function updateGameState () {
     let counter = 0;
@@ -327,8 +243,11 @@ function updateGameState () {
     } else {
         gameState = 'off';
         const numberOfPlayers = countOfPlayers - 1;
-        io.emit('send-info', 'Other players:' + numberOfPlayers +'<br>'+'To play required minimum two players with active status');
-    }   
+        io.emit('send-info', 'Other players:' + numberOfPlayers);
+    }  
+    if (adminPanelOn) {
+        adminIo.emit('player-count',counter);
+    }
 }
 
 /*socket.on('client-version', clientVersion => {
@@ -371,13 +290,17 @@ function clientVersionIsGood(socket) {
         return false;
     }*/
     });
-}   
+}  
+
+adminIo.on('connection', (socket) => {
+    console.log('Connect',socket.id);
+});
 
 
 io.on('connection', (socket) => {
     writeToLog('User with id:'+socket.id+' connect with server.');
     
-    io.emit('send-info', 'Other players:' + countOfPlayers);
+    io.emit('send-info', 'Players:' + countOfPlayers);
     const status = {
         host:  socket.handshake.headers.host,
         state: 'connected'
@@ -388,22 +311,6 @@ io.on('connection', (socket) => {
         
     writeToLog('User with id:'+socket.id+' connect with server.');
     
-    /*socket.on('enter-to-game', data => {
-        console.log(data);
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                console.log(socket.id, player);
-                player.state = data.state;
-                player.name = data.name;
-                console.log(socket.id, player);
-                
-                if (countOfPlayers < 2) {
-                    //socket.emit('send-alert', 'Waiting for more players. Required minimum two players with active status');
-                }
-            }
-        }
-    });*/
-    
     socket.on('enter-to-game', data => {
         writeToLog('User with id:'+data.name+' go to game.');
 
@@ -411,8 +318,8 @@ io.on('connection', (socket) => {
         writeToLog('Checking client version...');
 //        const next = clientVersionIsGood(socket); TODO: Check client version
         
-        const x = 1500;
-        const y = 800;
+        const x = 1735;
+        const y = 5;
         const newWeapon = new Weapon('Sztylet', 8, 14, 1, 80, 15, 'melee', 2);
         const newInvetory = new Invetory();
         const newSpellsBuffer = new SpellsBuffer();
@@ -428,19 +335,76 @@ io.on('connection', (socket) => {
 ];*/
         newInvetory.basicSlots[0].content = items[2];
         newInvetory.basicSlots[1].content = items[3];
-        newInvetory.basicSlots[0].amount = 3;
-        newInvetory.basicSlots[1].amount = 2;
-        const newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 250, 280, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells), structuredClone(recipes));
+        newInvetory.basicSlots[2].content = items[3];
+        newInvetory.basicSlots[3].content = items[2];
+        newInvetory.basicSlots[0].amount = 6;
+        newInvetory.basicSlots[1].amount = 8;
+        newInvetory.basicSlots[2].amount = 7;
+        newInvetory.basicSlots[3].amount = 14;
+        let newPlayer = new Player(socket.id, socket.id, 'PvP', x, y, 50, 65, 100, 100, weapons[3], new Hitbox(x, y, 50, 65), 3, 250, 280, [structuredClone(ammunitions[1])], newInvetory, newSpellsBuffer, structuredClone(spells), structuredClone(recipes));
         newPlayer.state = data.state;
         newPlayer.name = data.name;
+        newPlayer.login = data.login;
+        console.log(newPlayer.login);
+
         //    const player1 = new Player('id', 'Player1', 'PvP',10, 10, 50, 65, 100, 100, weapons[3], new Hitbox(10, 10, 50, 65), 4, 50, 50, [structuredClone(ammunitions[1])]);
         newPlayer.ammunition[0].allAmmunition = 15;
-        players.push(newPlayer);
-        gamePlayers.push(players[whereToGo]);
-        socket.emit('assign-player', players[whereToGo]);
+        
+        findUser({
+            name: newPlayer.login
+        }).then(res => {
+            if (res.length === 0) {
+                createUser({
+                    name: newPlayer.login,
+                    password: '',
+                    object: convertObject(newPlayer, 'json')
+                });
+                console.log("ZZZZZZZZZZZZZZZZZZZZZZ");
+                players.push(newPlayer);
+                gamePlayers.push(players[whereToGo]);
+                socket.emit('send-players', gamePlayers);
+                socket.emit('assign-player', players[whereToGo]);
+                socket.emit('send-players', gamePlayers);
+                socket.emit('send-blocks', GameObjects.blocks);
+                socket.emit('send-npcs', npcs);
+                countOfPlayers++;
+                whereToGo++;
+            } else {
+                            
+                newPlayer = convertObject(res[0].object, 'object');
+                newPlayer.id = socket.id;
+                let next = true;
+                for (const player of gamePlayers) {
+                    console.log(player.login, newPlayer.login, player.login === newPlayer.login);
+                    if (player.login === newPlayer.login) {
+                        
+                        socket.emit('connect-error');
+//                        socket.emit('delete-connection');
+//                        socket.disconnect();
+                        socket.emit('send-info','Sorry, but you are now logged.');
+                        socket.emit('send-status-server','Disconnected');
+                        if (next) {
+                            next = false;
+                        }                        
+                    }
+                }
+                console.log('REEEEEEEE',next);
+                if (next) {
+                    players.push(newPlayer);
+                    gamePlayers.push(players[whereToGo]);
+                    socket.emit('send-players', gamePlayers);
+                    socket.emit('assign-player', players[whereToGo]);
+                    socket.emit('send-players', gamePlayers);
+                    socket.emit('send-blocks', GameObjects.blocks);
+                    socket.emit('send-npcs', npcs);
 
-        countOfPlayers++;
-        whereToGo++;
+                    countOfPlayers++;
+                    whereToGo++;
+                }
+                console.log('REEEEEEEE',next, gamePlayers);
+            }
+        });
+        
     });
     
     socket.on('client-version', clientVersion => {
@@ -449,11 +413,9 @@ io.on('connection', (socket) => {
         } else {
             socket.emit('send-alert', 'Sorry but your version' + clientVersion + 'is not actually. Please update and come back.');
             let idOfUser;
-            console.log('User close. User ID:' + socket.id + '.');
             gamePlayers.forEach((player, i) => {
                 if (socket.id === player.id) {
                     idOfUser = i;
-                    console.log('User close. User in array:' + i + '.');
                 }
             });
 
@@ -469,143 +431,253 @@ io.on('connection', (socket) => {
     });
 
     socket.on('set-player-move-target', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                player.targetX = data.x;
-                player.targetY = data.y;
-            }
-        }
+       const player = findPlayer(socket.id);
+        player.targetX = data.x;
+        player.targetY = data.y;
+    });
+    
+    socket.on('create-enemy', data => {
+        const player = findPlayer(socket.id);
+//        ctx.fillRect(mouseX + x - ((width - myPlayer.width) / 2), mouseY + y - ((height - myPlayer.height) / 2), 50, 65);
+        GameObjects.enemies.push(new Enemy(0, (data.camera.x - (data.camera.width - player.width) / 2) + data.x, (data.camera.y - (data.camera.height - player.height) / 2) + data.y, 50, 65, 40, 40, weapons[1], new Hitbox(undefined, undefined, 50, 65), 1, 1, structuredClone(items[1]), 1, 0, [structuredClone(ammunitions[1])]));
+//        console.log('Itsenemy',enemy);
+//        const length = GameObjects.enemies.length - 1;
+        const enemy = GameObjects.enemies.pop();
+        enemy.secondAiState = 'icanshoot?';
+        enemy.aiState = 'whereplayer';
+        enemy.ammunition[0].allAmmunition = 15;
+        let counter = 0;
+        for (let x = 0; x < 9; x++) {
+            enemy.fieldOfView[x] = {
+                x: counter,
+                y: -180,
+                state: 2
+            };
+            counter += 20;
+        } 
+        fieldOfView(enemy,GameObjects.blocks);
+        GameObjects.enemies.push(enemy);
+        choosePlayer(enemy,gamePlayers);
+    });
+    
+    socket.on('delete-enemy', data => {
+        const player = findPlayer(socket.id);
+//        ctx.fillRect(mouseX + x - ((width - myPlayer.width) / 2), mouseY + y - ((height - myPlayer.height) / 2), 50, 65);
+        const cursorHitbox = new Hitbox((data.camera.x - (data.camera.width - player.width) / 2) + data.x,  (data.camera.y - (data.camera.height - player.height) / 2) + data.y, 25, 25);
+        GameObjects.enemies.forEach((enemy, id)=>{
+            if (checkCollisionWith(enemy.hitbox, cursorHitbox)) {
+                GameObjects.enemies.splice(id, 1);        
+            }    
+        });
+        
+        /*GameObjects.enemies.push(new Enemy(0, (data.camera.x - (data.camera.width - player.width) / 2) + data.x, (data.camera.y - (data.camera.height - player.height) / 2) + data.y, 50, 65, 40, 40, weapons[3], new Hitbox(undefined, undefined, 50, 65), 1, 1, structuredClone(items[1]), 1, 0, [structuredClone(ammunitions[1])]));
+
+        const length = GameObjects.enemies.length - 1;
+        GameObjects.enemies[length].secondAiState = 'icanshoot?';
+        GameObjects.enemies[length].aiState = 'whereplayer';
+        console.log(GameObjects.enemies[length]);
+        GameObjects.enemies[length].ammunition[0].allAmmunition = 15;*/
     });
     
     socket.on('change-moving-state', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                player.moving = data;
-            }
-        }
-    }); 
+        const player = findPlayer(socket.id);
+        player.moving = data;
+    });
     
-    socket.on('request-cursor-mode', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                for (const spell of spells) {
-                    if (spell.name === player.actualSpell) {
-                        console.log('Player:',player.actualSpell, 'Finded:',spell.name);
-                        const cursorMode = spell.bewitch(data, player, 'player', player.spellsBuffer);
-                        socket.emit('change-cursor-state', cursorMode);
+    socket.on('craft-item', data => {
+        const player = findPlayer(socket.id);
+        const recipe = player.recipes[data];
+        const harvested = structuredClone(recipe);
+        const invetory = player.invetory.basicSlots;
+        
+        harvested.ingredients.forEach((ingredient, index)=>{
+            ingredient.amount = 0;
+        });
+        
+        recipe.ingredients.forEach((ingredient, index)=>{
+            invetory.forEach((item, itemIndex)=>{
+                if (harvested.ingredients[index].item.itemName === ingredient.item.itemName && harvested.ingredients[index].amount < ingredient.amount && harvested.ingredients[index].item.itemName === item.content.itemName) {
+                    harvested.ingredients[index].amount += item.amount;
+                    const old = harvested.ingredients[index].amount;
+                    
+                    if (harvested.ingredients[index].amount > ingredient.amount) {
+                        harvested.ingredients[index].amount = ingredient.amount;
+                        console.log(ingredient.amount,  old);
+                        item.amount -= Math.abs( old - ingredient.amount);
+                    } else {
+                        item.amount = 0;
+                        item.content = 'empty';
                     }
                 }
+            });
+        });
+        
+        const need = harvested.ingredients.every((ingredient, index) => {
+            const require = recipe.ingredients[index];
+            return ingredient.item.itemName === require.item.itemName && ingredient.amount === require.amount;
+        });
+        console.log(need);
+        if (need) {
+            recipe.products.forEach((product, index)=>{
+                addItem(player.invetory,product.item, product.amount);
+                console.log(product);
+            });
+        }
+        
+    });
+
+    socket.on('move-item-in-invetory', data => {
+        const player = findPlayer(socket.id);
+        player.invetory.basicSlots.forEach((slot, index)=>{
+            if (checkCollisionWith(new Hitbox(data.x, data.y, 1, 1), new Hitbox(slot.x + 323, slot.y + 126, 85, 85))) {
+                const {moving, movingItem} = player.movingInvetoryBuffer;
+                
+                if (!moving && slot.content !== 'empty') {
+                    player.movingInvetoryBuffer.moving = true;
+                    player.movingInvetoryBuffer.movingItem = slot.content;
+                    player.movingInvetoryBuffer.movingItem.amount = slot.amount;
+                    player.movingInvetoryBuffer.oldSlotNumber = index;
+                    player.movingInvetoryBuffer.oldSlotAmount = slot.amount;
+                    slot.content = 'empty';
+                    slot.amount = 0;
+                } else if (moving && slot.content !== 'empty') {
+                    if (slot.content.itemName === player.movingInvetoryBuffer.movingItem.itemName) {
+                        player.movingInvetoryBuffer.moving = false;
+                        player.invetory.basicSlots[player.movingInvetoryBuffer.oldSlotNumber].amount
+                        slot.content = player.movingInvetoryBuffer.movingItem;
+                        slot.amount += player.movingInvetoryBuffer.movingItem.amount;
+                    } else {
+                        player.movingInvetoryBuffer.moving = false;
+                        player.invetory.basicSlots[player.movingInvetoryBuffer.oldSlotNumber].content = slot.content;
+                        player.invetory.basicSlots[player.movingInvetoryBuffer.oldSlotNumber].amount = slot.amount;
+                        slot.content = player.movingInvetoryBuffer.movingItem;
+                        slot.amount = player.movingInvetoryBuffer.movingItem.amount;
+                    }
+
+                } else if (moving && slot.content === 'empty') {
+                    player.movingInvetoryBuffer.moving = false;
+                    slot.content = player.movingInvetoryBuffer.movingItem;
+                    slot.amount = player.movingInvetoryBuffer.movingItem.amount;
+                    player.movingInvetoryBuffer.movingItem;
+                    player.movingInvetoryBuffer.movingItem.amount;
+                    player.movingInvetoryBuffer.movingItem = slot.content;
+                    player.movingInvetoryBuffer.movingItem.amount = slot.amount;
+                }
+            }
+        });
+    });
+    
+    function findPlayer(socketId) {
+        for (const player of gamePlayers) {
+            if (socket.id === player.id) {
+                return player;
+            }
+        }
+    }
+        
+    socket.on('request-cursor-mode', data => {
+        const player = findPlayer(socket.id);
+        for (const spell of spells) {
+            if (spell.name === player.actualSpell) {
+                console.log('Player:', player.actualSpell, 'Finded:', spell.name);
+                const cursorMode = spell.bewitch(data, player, 'player', player.spellsBuffer);
+                socket.emit('change-cursor-state', cursorMode);
             }
         }
     });
     
     socket.on('spell-marking', data => {
-        console.log(data);
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                let actualSpell;
-                for (const spell of spells) {
-                    if (player.actualSpell === spell.name) {
-                        actualSpell = spell;
-                        break;
-                    }
-                }
+        const player = findPlayer(socket.id);
+        let actualSpell;
+        for (const spell of spells) {
+            if (player.actualSpell === spell.name) {
+                actualSpell = spell;
+                break;
+            }
+        }
 
-                if (actualSpell.availablesObjects.substr(0, 5) === 'enemy') {
-                    const objects = GameObjects.enemies.concat(gamePlayers);
+        if (actualSpell.availablesObjects.substr(0, 5) === 'enemy') {
+            const objects = GameObjects.enemies.concat(gamePlayers);
+            socket.emit('change-cursor-state', 'auto');
+
+            for (const object of objects) {
+
+                const collisionWith = checkCollisionWith(data, object.hitbox);
+                if (collisionWith) {
+
                     socket.emit('change-cursor-state', 'auto');
-                    console.log(objects.length, GameObjects.enemies.length + gamePlayers.length);
-
-                    for (const object of objects) {
-
-                        const collisionWith = checkCollisionWith(data, object.hitbox);
-                        //                    console.log(collisionWith, data, object.hitbox);
-                        if (collisionWith) {
-
-                            //                        console.log('DWA', object);
-                            socket.emit('change-cursor-state', 'auto');
-                            //                        can.style.cursor = 'auto';
-                            player.magicEnergy -= actualSpell.requiredMagicEnergy;
-                            if (actualSpell.action === 'thunderboltAttack') {
-                                console.log('AA');
-                                actualSpell.completeSpell(object);
-                                player.spellsBuffer.spells.push('thunderboltAttack');
-                                player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
-                                console.log(player.spellsBuffer.reloadsTimes, player.spellsBuffer.spells);
-                            } else if (actualSpell.action === 'oblivion' && object.aiState !== undefined) {
-                                const oldAiState = object.aiState;
-                                const oldSecondAiState = object.secondAiState;
-                                //
-                                object.aiState = 'oblivion';
-                                object.secondAiState = 'oblivion';
-
-                                player.spellsBuffer.spells.push('oblivion');
-                                player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
-                                //
-                                setTimeout(() => {
-                                    console.log(object.aiState)
-                                }, 100);
-                                //
-                                setTimeout(() => {
-                                    object.aiState = oldAiState;
-                                    object.secondAiState = oldSecondAiState;
-                                }, actualSpell.time * 1000);
-                            }
-                        }
-                    }
-                } else if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
-                    const {
-                        action,
-                        minDmg,
-                        maxDmg
-                    } = actualSpell;
-                    let bulletWidth, bulletHeight;
-
-                    if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
-                        if (action === 'ballOfFire') {
-                            bulletWidth = 50;
-                            bulletHeight = 50;
-                        } else if (action === 'magicTrap') {
-                            bulletHeight = 25;
-                            bulletWidth = 25;
-                        }
-                        player.magicEnergy -= actualSpell.requiredMagicEnergy;
-                        player.spellsBuffer.spells.push(actualSpell.action);
+                    player.magicEnergy -= actualSpell.requiredMagicEnergy;
+                    if (actualSpell.action === 'thunderboltAttack') {
+                        actualSpell.completeSpell(object);
+                        player.spellsBuffer.spells.push('thunderboltAttack');
                         player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
-                        
-                        
-                        GameObjects.bullets.push(new Bullet(player.x, player.y, bulletWidth, bulletHeight, new Hitbox(player.x, player.y, bulletWidth, bulletHeight), 2, minDmg, maxDmg, data.x, data.y, player.id, 560));
+                    } else if (actualSpell.action === 'oblivion' && object.aiState !== undefined) {
+                        const oldAiState = object.aiState;
+                        const oldSecondAiState = object.secondAiState;
+                        //
+                        object.aiState = 'oblivion';
+                        object.secondAiState = 'oblivion';
 
-                        console.log(GameObjects.bullets[GameObjects.bullets.length - 1]);
-
-                        if (action === 'magicTrap') {
-                            GameObjects.bullets[GameObjects.bullets.length - 1].getMove = false;
-                            GameObjects.bullets[GameObjects.bullets.length - 1].distance = 1;
-                        }
-
-                        for (const bullet of GameObjects.bullets) {
-                            console.log(bullet);
-                            if (bullet.owner === player.id) {
-                                console.log('TRUE', player, 'TRUE');
-                                bullet.checkTheDirection(player);
-                            }
-                        }
-                        /*cursorMode = 'moving';
-                        can.style.cursor = 'auto';*/
-                        socket.emit('change-cursor-state', 'moving');
+                        player.spellsBuffer.spells.push('oblivion');
+                        player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
+                        //
+                        setTimeout(() => {
+                        }, 100);
+                        //
+                        setTimeout(() => {
+                            object.aiState = oldAiState;
+                            object.secondAiState = oldSecondAiState;
+                        }, actualSpell.time * 1000);
                     }
                 }
+            }
+        } else if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
+            const {
+                action,
+                minDmg,
+                maxDmg
+            } = actualSpell;
+            let bulletWidth, bulletHeight;
+
+            if (actualSpell.availablesObjects.substr(0, 9) === 'direction') {
+                if (action === 'ballOfFire') {
+                    bulletWidth = 50;
+                    bulletHeight = 50;
+                } else if (action === 'magicTrap') {
+                    bulletHeight = 25;
+                    bulletWidth = 25;
+                }
+                player.magicEnergy -= actualSpell.requiredMagicEnergy;
+                player.spellsBuffer.spells.push(actualSpell.action);
+                player.spellsBuffer.reloadsTimes.push(actualSpell.reload * 1000);
+
+
+                GameObjects.bullets.push(new Bullet(player.x, player.y, bulletWidth, bulletHeight, new Hitbox(player.x, player.y, bulletWidth, bulletHeight), 2, minDmg, maxDmg, data.x, data.y, player.id, 560));
+
+
+                if (action === 'magicTrap') {
+                    GameObjects.bullets[GameObjects.bullets.length - 1].getMove = false;
+                    GameObjects.bullets[GameObjects.bullets.length - 1].distance = 1;
+                }
+
+                for (const bullet of GameObjects.bullets) {
+                    if (bullet.owner === player.id) {
+                        checkTheDirectionOfTheBullet(bullet, player);
+                    }
+                }
+                /*cursorMode = 'moving';
+                can.style.cursor = 'auto';*/
+                socket.emit('change-cursor-state', 'moving');
             }
         }
     });
         
     
     socket.on('player-attack', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-//                player.attack(data, gameTimer, undefined, undefined, 'player');OLD
-                player.attack(data, gameTimer);    
-            }
+        const player = findPlayer(socket.id);
+        if (player.state !== 'spectator') {
+            //                player.attack(data, gameTimer, undefined, undefined, 'player');OLD
+            attack(data, gameTimer, player, player.weapon, attackWeapon);
         }
     });
     
@@ -613,7 +685,6 @@ io.on('connection', (socket) => {
         for (const player of gamePlayers) {
             if (socket.id === player.id && player.state !== 'spectator' && data === 3) {
                 gameTimer.listOfTicks.push(new Tick('Player To block PlayerId:' + player.id, gameTimer.generalGameTime, gameTimer.generalGameTime + 150));    
-                console.log('Added', gameTimer.listOfTicks);
                 break;
             }
         }
@@ -625,7 +696,6 @@ io.on('connection', (socket) => {
                  for (const tick of gameTimer.listOfTicks) {
                      if (tick.nameOfTick.substr(0, 24) === 'Player To block PlayerId' && tick.nameOfTick.substr(25) === player.id) {
                          tick.old = true;
-                         console.log('Removed');
                      }
                  }
              }
@@ -635,74 +705,69 @@ io.on('connection', (socket) => {
     
     
     socket.on('player-open-chest', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-                for (const chest of GameObjects.chests) {
-                    if (checkCollisionWith(player.hitbox, chest.hitbox)) {
-                        chest.open(player, player.invetory);
-                        console.log('Player with name:'+player.name+' (id)'+player.id+'open the chest.');
-                    }
+        const player = findPlayer(socket.id);
+        if (player.state !== 'spectator') {
+            for (const chest of GameObjects.chests) {
+                if (checkCollisionWith(player.hitbox, chest.hitbox)) {
+                    openChest(chest ,player, player.invetory);
+                    writeToLog('Player with name:' + player.name + ' (id)' + player.id + 'open the chest.');
                 }
             }
         }
     });
     
     socket.on('player-change-weapon', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-                player.weapon = weapons[player.weaponCounter];
-                player.weaponCounter++;
-                if (player.weaponCounter === 4) {
-                    player.weaponCounter = 0;   
-                }
+        const player = findPlayer(socket.id);
+        if (player.state !== 'spectator') {
+            player.weapon = weapons[player.weaponCounter];
+            player.weaponCounter++;
+            if (player.weaponCounter === 4) {
+                player.weaponCounter = 0;
             }
         }
     });
     
     socket.on('player-change-spell', data => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-                player.actualSpell = spells[player.spellCounter].name;
-                player.spellCounter++;
-                if (player.spellCounter === 4) {
-                    player.spellCounter = 0;   
-                }
+        const player = findPlayer(socket.id);
+        if (player.state !== 'spectator') {
+            player.actualSpell = spells[player.spellCounter].name;
+            player.spellCounter++;
+            if (player.spellCounter === 4) {
+                player.spellCounter = 0;
             }
         }
     });
     
     socket.on('player-start-move', keyCode => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-                if (keyCode === 87) {
-                    player.movingDirectionAxisY = 'Up';
-                } else if (keyCode === 83) {
-                    player.movingDirectionAxisY = 'Down';
-                } else if (keyCode === 65) {
-                    player.movingDirectionAxisX = 'Left';
-                } else if (keyCode === 68) {
-                    player.movingDirectionAxisX = 'Right';
-                }
+        const player = findPlayer(socket.id);
+        console.log(socket.id, player);
+        if (player.state !== 'spectator') {
+            if (keyCode === 87) {
+                player.movingDirectionAxisY = 'Up';
+            } else if (keyCode === 83) {
+                player.movingDirectionAxisY = 'Down';
+            } else if (keyCode === 65) {
+                player.movingDirectionAxisX = 'Left';
+            } else if (keyCode === 68) {
+                player.movingDirectionAxisX = 'Right';
             }
         }
     });
 
     socket.on('player-stop-move', keyCode => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id && player.state !== 'spectator') {
-                if (keyCode === 87 || keyCode === 83) {
-                    player.movingDirectionAxisY = 'None';
-                } else if (keyCode === 65 || keyCode === 68) {
-                    player.movingDirectionAxisX = 'None';
-                }
+        const player = findPlayer(socket.id);
+        if (player.state !== undefined && player.state !== 'spectator') {
+            if (keyCode === 87 || keyCode === 83) {
+                player.movingDirectionAxisY = 'None';
+            } else if (keyCode === 65 || keyCode === 68) {
+                player.movingDirectionAxisX = 'None';
             }
         }
     });
     
     socket.on('update-object', keyCode => {
-        for (const player of gamePlayers) {
-            if (socket.id === player.id) {
-                /*const x = player.x - 700 - 50;
+        const player = findPlayer(socket.id);
+        /*const x = player.x - 700 - 50;
                 const y = player.y - 460 - 50;
                 const cameraHitbox = new Hitbox(x, y, 1400 + 50, 920 + 50);
 
@@ -721,38 +786,35 @@ io.on('connection', (socket) => {
                     }
                 }
 
-                console.log(chunksToSend.length, GameObjects.map.chunks.length * GameObjects.map.chunks.length);
-                console.log(convertNumberToPercent(chunksToSend.length, GameObjects.map.chunks.length * GameObjects.map.chunks.length).toFixed(2));
-//                socket.emit('send-chunks', chunksToSend);*/
-                
-                const x = player.x - 700 - 50;
-                const y = player.y - 460 - 50;
-                const cameraHitbox = new Hitbox(x, y, 1400 + 50, 920 + 50);
+        */
+        const x = player.x - ((1400 - player.width) / 2);
+        const y = player.y - ((920 - player.height) / 2);
+//        const y = player.y - 460 - 50;
+        const cameraHitbox = new Hitbox(x, y, 1400, 920);
+//        ((1400 - myPlayer.width) / 2)
 
-                let blocks = [];
-                let blocksToCheck = [];
-                
-                for (let i = 0; i < GameObjects.blocks.length; i++) {
-                        const block = GameObjects.blocks[i];
-                        if (Math.max(block.x - player.x, player.x - block.x) + Math.max(block.y - player.y, player.y - block.y) < 1800) {
-                            blocksToCheck.push(block);        
-                        }
-                }
-                
-                 for (let i = 0; i < blocksToCheck.length; i++) {
-                        const block = blocksToCheck[i];
-                        if (checkCollisionWith(block.hitbox, cameraHitbox)) {
-                            blocks.push(block);
-                        }
-                }
+        let blocks = [];
+        let blocksToCheck = [];
 
-//                socket.emit('send-chunks', chunksToSend);
-                
-                socket.emit('send-blocks', blocks);
-                socket.emit('send-blocks-stats', convertNumberToPercent(blocksToCheck.length, GameObjects.blocks.length).toFixed(2));
-
+        for (let i = 0; i < GameObjects.blocks.length; i++) {
+            const block = GameObjects.blocks[i];
+            if (Math.max(block.x - player.x, player.x - block.x) + Math.max(block.y - player.y, player.y - block.y) < 1800) {
+                blocksToCheck.push(block);
             }
         }
+
+        for (let i = 0; i < blocksToCheck.length; i++) {
+            const block = blocksToCheck[i];
+            if (checkCollisionWith(block.hitbox, cameraHitbox)) {
+                blocks.push(block);
+            }
+        }
+
+        //                socket.emit('send-chunks', chunksToSend);
+
+//        socket.emit('send-blocks', blocks);//TODO: Na potrzeby wygody zmieniono na wszystkie bloki. Zmienić potem!!!
+        socket.emit('send-blocks', GameObjects.blocks);
+        socket.emit('debug-saved-items-count', [{a:blocks.length, b:GameObjects.blocks.length}]);
     });
     
     
@@ -760,8 +822,27 @@ io.on('connection', (socket) => {
         callback();
     });
 
+    socket.on('save-progress', ()=> {
+        const player = findPlayer(socket.id);
+        updateUser({name:player.login},{object:convertObject(player, 'json')}).then(res=>{
+            if (res === 'Error') {
+                socket.emit('save-status',{status:'error'});
+            } else {
+                socket.emit('save-status',{status:'saved'});
+            }
+            
+        });
+//        io.to(socket.id).emit('save-status',{status:'saved'});
+        /*console.log('Save');
+    for (const player of gamePlayers) {
+        updateUser({name:player.login},{object:convertObject(player, 'json')});    
+    }*/
+    });
+    
     socket.on('disconnect', function () {
         let idOfUser = -1;
+
+        const player = findPlayer(socket.id);
         console.log('User close. User ID:' + socket.id + '.');
         gamePlayers.forEach((player, i) => {
             if (socket.id === player.id) {
@@ -769,22 +850,15 @@ io.on('connection', (socket) => {
                 console.log('User close. User in array:' + i + '.');
             }
         });
-        
-        if (!idOfUser === -1) {
-            whereToGo = idOfUser;
 
+        if (idOfUser !== -1) {
+            whereToGo = idOfUser;
             gamePlayers.splice(idOfUser, 1);
             players.splice(idOfUser, 1);
             countOfPlayers--;
             io.emit('send-info', 'Other players:' + countOfPlayers);
-            console.log('-----------------------');
-            console.log(idOfUser);
-            console.log(players);
-            console.log(gamePlayers);
-            console.log('-----------------------');
             writeToLog('User with id:' + socket.id + ' disconnect with server.');
         }
-        
     });
 });
 
@@ -816,12 +890,12 @@ function bulletsLoop() {
             for (const bullet of GameObjects.bullets) {
                 for (const player of gamePlayers) {
                     if (bullet.owner === player.id) {
-                        bullet.checkTheDirection(player);
+                        checkTheDirectionOfTheBullet(bullet,player);
                     }
                 }
                 for (const enemy of GameObjects.enemies) {
                     if (bullet.owner === 'Enemy'+enemy.id) {
-                        bullet.checkTheDirection(enemy);
+                        checkTheDirectionOfTheBullet(bullet,enemy);
                     }
                 }
             }
@@ -946,24 +1020,30 @@ function gameLoop() {
         }
         
         for (const enemy of GameObjects.enemies) {
-            enemy.choosePlayer(gamePlayers);
-            enemy.enemyAi(gameAttackList, enemy.objectivePlayer, gameTimer, GameObjects.chests, GameObjects.bullets, GameObjects.blocks);
+            choosePlayer(enemy, gamePlayers);
+            fieldOfView(enemy,GameObjects.blocks);
+            enemyAi(enemy,gameAttackList, enemy.objectivePlayer, gameTimer, GameObjects.chests, GameObjects.bullets, GameObjects.blocks);
+//            console.log(enemy.aiState, enemy.secondAiState);
 
             if (enemy.aiState !== 'dodge') {
-                if (enemy.weapon.type === 'distance' && enemy.aiState !== 'shooting') {
+                if (enemy.weapon.type === 'distance' && enemy.aiState !== 'shooting' && enemy.secondAiState !== 'loadingpath' && enemy.secondAiState !== 'walk') {
                     enemy.secondAiState = 'icanshoot?';
                 }
-                if (enemy.weapon.type === 'distance' && enemy.aiState !== 'shooting' && enemy.aiState !== 'oblivion') {
-                    enemy.aiState = 'quest';
-                } else if (enemy.weapon.type !== 'distance' && enemy.aiState !== 'oblivion') {
-                    enemy.aiState = 'quest';
+                if (enemy.weapon.type === 'distance' && enemy.aiState !== 'shooting' && enemy.aiState !== 'oblivion' && enemy.aiState !== 'pathwalking' && enemy.aiState !== 'walk') {
+//                    enemy.aiState = 'quest';
+                } else if (enemy.weapon.type !== 'distance' && enemy.aiState !== 'oblivion' && enemy.aiState !== 'pathwalking' && enemy.aiState !== 'walk') {
+//                    enemy.aiState = 'quest';
                 }
             }
 
         }
         
+        for (const npc of npcs) {
+            npc.ai();
+        }
+        
         GameObjects.bullets.forEach((bullet, idOfBullet) => {
-            bullet.move();
+            moveBullet(bullet);
             if (bullet.speed <= 0) {
                 GameObjects.bullets.splice(idOfBullet, 1);
             }
@@ -1012,11 +1092,15 @@ function gameLoop() {
                 tick.old = true;
 
             } else if (tick.nameOfTick.substr(0, 34) === 'Reloading a player distance weapon' && tick.done && !tick.old) {   
+                console.log(tick.nameOfTick)
+                console.log(tick)
                 console.log(tick.nameOfTick.substr(0, 34), tick.nameOfTick.substr(34).split(',')[0], tick.nameOfTick.substr(34).split(',')[1]);
                 const ammoId = tick.nameOfTick.substr(34).split(',')[1];
                 const player = gamePlayers.filter(player => {
                     return player.id === tick.nameOfTick.substr(34).split(',')[0];
                 })[0];
+                console.log(player)
+                console.log(player.ammunition);
                 player.ammunition[ammoId].reloading = false;    
                 console.log(player.ammunition[ammoId].actualAmmunition, player.ammunition[ammoId], player.ammunition[ammoId].maxMagazine)
                 player.ammunition[ammoId].actualAmmunition = player.ammunition[ammoId].actualAmmunition + Math.min(player.ammunition[ammoId].allAmmunition, player.ammunition[ammoId].maxMagazine);
@@ -1028,7 +1112,7 @@ function gameLoop() {
                     return enemy.id === Number(tick.nameOfTick.substr(33).split(',')[0]);
                 })[0];
                 console.log(tick.nameOfTick.substr(33).split(',')[0]);
-                console.log(GameObjects.enemies[0].id);
+//                console.log(GameObjects.enemies[0].id);
                 enemy.ammunition[ammoId].reloading = false;   
                 console.log(enemy.ammunition[ammoId]);
                 console.log(enemy.ammunition[ammoId].actualAmmunition, enemy.ammunition[ammoId], enemy.ammunition[ammoId].maxMagazine);
@@ -1045,31 +1129,80 @@ function gameLoop() {
                 }
             }
         }
+        //TODO: Sprawdź co gracz widzi!!!!! I wyślij tylko to do niego!!!!!!!! IMPORTANT:TAG ZROBIONO: Bloki, skrzynie, bullets, player. ZOSTAŁY: enemies. 
         
-        //TODO: Sprawdź co gracz widzi!!!!! I wyślij tylko to do niego!!!!!!!! IMPORTANT:TAG ZROBIONO: Bloki. ZOSTAŁY: skrzynie, enemies, bullets, players 
-        io.emit('send-bullets', GameObjects.bullets);
-        io.emit('send-chests', GameObjects.chests);
-        io.emit('send-enemies', GameObjects.enemies);
-        io.emit('send-players', gamePlayers);
         
-        clearTimerCache(gameTimer);
-        
-    }
-    
-    /*for (const user of gamePlayers) {
-        let msg = '';
         for (const player of gamePlayers) {
-            if (player.id === user.id) {
-                msg += player.id + ':' + 'OK<br>';     
-            } else {
-                msg += player.id + ':' + 'X<br>';      
-            }
+            const chest = sendObjects(GameObjects.chests, player, 'send-chests');   
+            const players = sendObjects(gamePlayers, player, 'send-players');   
+            const bullets = sendObjects(GameObjects.bullets, player, 'send-bullets');   
+            const npsc = sendObjects(npcs, player, 'send-npcs');   
+            io.to(player.id).emit('debug-saved-items-second-count',[chest, players, bullets, npsc]);
         }
-        io.to(user.id).emit('send-status-server', 'YOU are:' + user.id + '<br>' + msg + '<br>END');
-        console.log(user.id);
-    }*/
+        
+        
+        io.emit('send-enemies', GameObjects.enemies);
+        io.emit('send-time', gameTimer.generalGameTime);
+        clearTimerCache(gameTimer);
+    }
 }
 
+function sendObjects(allObjects, player, emitName) {
+            const {width,height} = player;
+            const x = player.x - ((1400 - player.width) / 2);
+            const y = player.y - ((920 - player.height) / 2);
+            const cameraHitbox = new Hitbox(x, y, 1400, 920);
+
+            let objects = [];
+            let objectsToCheck = [];
+
+            for (let i = 0; i < allObjects.length; i++) {
+                const object = allObjects[i];
+                if (Math.max(object.x - player.x, player.x - object.x) + Math.max(object.y - player.y, player.y - object.y) < 1800) {
+                    objectsToCheck.push(object);
+                }
+            }
+
+            for (let i = 0; i < objectsToCheck.length; i++) {
+                const object = objectsToCheck[i];
+                if (checkCollisionWith(object.hitbox, cameraHitbox)) {
+                    objects.push(object);
+                }
+            }
+            io.to(player.id).emit(emitName, objects);
+            return {a:objects.length,b:allObjects.length,name:emitName.split('-')[1]};
+        }
+
+let lastTime = Date.now();
+
+setInterval(()=>{
+    if(adminPanelOn) {
+        const data = {objects:GameObjects,players:gamePlayers}
+        adminIo.emit('game-objects',data);
+    }
+},100);
+
+setInterval(()=>{
+    console.log('Save');
+    for (const player of gamePlayers) {
+        updateUser({name:player.login},{object:convertObject(player, 'json')});    
+    }
+},1000*50);
+
 setInterval(bulletsLoop, 35);
-setInterval(gameLoop, 25);
-setInterval(timeLoop, 1, gameTimer);
+setInterval(gameLoop, 30);
+setInterval(() => {
+    gameTimer.generalGameTime += 15;
+    for (let i = 0; i < gameTimer.listOfTicks.length; i++) {
+        if (gameTimer.listOfTicks[i].endTime < gameTimer.generalGameTime) {
+            gameTimer.listOfTicks[i].done = true;
+        }
+    }
+    /*gameTimer.generalGameTime += 15 + ( 15 - (Date.now() - lastTime));
+    lastTime = Date.now();
+    for (let i = 0; i < gameTimer.listOfTicks.length; i++) {
+        if (gameTimer.listOfTicks[i].endTime < gameTimer.generalGameTime) {
+            gameTimer.listOfTicks[i].done = true;
+        }
+    }*/
+}, 15);

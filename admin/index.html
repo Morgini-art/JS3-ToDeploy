@@ -1,0 +1,64 @@
+<!DOCTYPE HTML>
+<html lang='pl'>
+<head>
+    <meta charset='utf-8' />
+    <meta http-equiv='X-UA-Compatible' content='IE=egde,chrome=1' />
+    <title>JS3 Rebulid Multiplayer Admin Panel</title>
+    <script src='socket.io-lib\socket.io\client-dist\socket.io.min.js' crossorigin='anonymous'></script>
+    <script src='main.js' defer></script>
+</head>
+
+<style>
+    #chests, #players,#enemies{
+        display: grid;
+        grid-template-columns: 480px;
+        grid-template-rows: 300px;
+        height: 480px;
+        justify-content: center;
+    } 
+    
+    #main {
+        margin: 0 auto;
+        display: block;
+        text-align: center;
+    }
+    
+    #watching-list .object-element{
+        display: block;
+        overflow: scroll;
+    }
+    
+    .object-element {
+        width: 300px;
+        height: 480px;
+        border: solid 1px black;
+        overflow:hidden;
+    }
+</style>
+
+<body>
+    <h3>JS3 Rebulid Multiplayer Admin Panel</h3>
+    <div id='main'>
+       
+        PlayerCount:<p id='player-count'></p>
+        
+        <h3>ChestsList</h3><p id='chests-list'></p>
+        Chests:<p id='chests'></p><br>
+
+        <h3>PlayerList</h3><p id='players-list'></p>
+        Players:<p id='players'></p>
+        
+        <h3>EnemiesList</h3><p id='enemies-list'></p>
+        Enemies:<p id='enemies'></p>
+        
+        <input id='filtr' type="text" placeholder="Filtr...">
+        
+        <h3>Filtered</h3><p ></p>
+        <p id='filtered'></p>
+        
+        WatchingObjects:<p id='watching-list'></p>
+    </div>
+    
+</body>
+
+</html>

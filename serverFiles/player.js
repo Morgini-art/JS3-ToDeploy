@@ -12,6 +12,7 @@ class Player extends Creature {
         this.movingDirectionAxisY;
         this.targetX;
         this.targetY;
+        this.login;
         this.isMovingX;
         this.state = 'noPlay';
         this.isMovingY;
@@ -24,6 +25,7 @@ class Player extends Creature {
         this.spellCounter = 0;
         this.fightActions = {};
         this.toBlock;
+        this.movingInvetoryBuffer = { moving : false, movingItem : 0, oldSlotNumber: 0, oldSlotAmount: 0};
         this.block = false;
         this.invetory = invetory;
         this.spellsBuffer = spellsBuffer;
@@ -31,114 +33,77 @@ class Player extends Creature {
         this.spells = spells;
         this.recipes = recipes;
     }
+}
 
-    drawPlayer(ctx) {
-        const {
-            x,
-            y,
-            height,
-            width
-        } = this;
-        ctx.fillStyle = 'green';
-        ctx.fillRect(x, y, width, height);
-    }
+function attack(objectives, gameTimer, player,weapon, weaponAttack) {
+    /*const {weapon, ammunition} = this;
+    if (e.key === 'q' && collision && weapon.type === 'melee') {
+        weapon.attack(this, objective, generalTimer);
+    } else if (!collision && weapon.type === 'distance' && e.button === 2) {
+        weapon.attack(this, objective, generalTimer, e, ammunition, 'player');
+    }*/
+    weaponAttack(player, weapon,objectives, gameTimer, null, 'player');
+}
 
-    movingPlayer(layerX, layerY) {
-        const {
-            x,
-            y,
-            movingDirectionAxisX,
-            movingDirectionAxisY,
-            isMovingX,
-            isMovingY
-        } = this;
-        
-        this.movingDirectionAxisX = (x > layerX) ? this.movingDirectionAxisX = 'Left' : this.movingDirectionAxisX = 'Right';
-        //this.targetX = Math.max(layerX);
+function move(player) {
 
-        this.movingDirectionAxisY = (y > layerY) ? this.movingDirectionAxisY = 'Up' : this.movingDirectionAxisY = 'Down';
-        //this.targetY = Math.max(layerY);
+    const {
+        x,
+        y,
+        targetX,
+        targetY,
+        movingDirectionAxisX,
+        movingDirectionAxisY,
+        isMovingX,
+        isMovingY,
+        movingSpeed
+    } = player;
 
-        this.isMovingX = true;
-        this.isMovingY = true;
-        
-    }
-    
-    moveObjects(movingObjects, movingSpeed, char, axis) {
-        movingObjects.forEach((object, i) => {
-            if (axis === 'x') {
-                if (char === '+') {
-                    movingObjects[i].x += movingSpeed;
-                } else {
-                    movingObjects[i].x -= movingSpeed;
-                }
-                this.targetX -= movingSpeed / 2;
-            } else {
-                if (char === '+') {
-                    movingObjects[i].y += movingSpeed;
-                } else {
-                   movingObjects[i].y -= movingSpeed; 
-                }   
-                this.targetY -= movingSpeed / 2;
-            }
-            //console.log(movingObjects[i].x);
-            //console.log(movingObjects[i].y);
-        });
-        //console.log(movingObjects);
-    }
-    
-    move() { //TODO: STATIC MOVING => DYNAMIC MOVING
 
-        const {
-            x,
-            y,
-            targetX,
-            targetY,
-            movingDirectionAxisX,
-            movingDirectionAxisY,
-            isMovingX,
-            isMovingY,
-            movingSpeed
-        } = this;
-
-        
-        //console.log(isMovingX, isMovingY, x, y);
-        if (isMovingX) {
-            if (movingDirectionAxisX === 'Left') {
-                this.x -= movingSpeed;
-            } else if (movingDirectionAxisX === 'Right') {
-                this.x += movingSpeed;
-            }
+    //console.log(isMovingX, isMovingY, x, y);
+    if (isMovingX) {
+        if (movingDirectionAxisX === 'Left') {
+            player.x -= movingSpeed;
+        } else if (movingDirectionAxisX === 'Right') {
+            player.x += movingSpeed;
         }
-        
-        if (isMovingY) {
-            if (movingDirectionAxisY === 'Up') {
-                this.y -= movingSpeed;
-                //if (y === targetY || y <= targetY) {
-                    //this.isMovingY = false;
-                //}
-            } else if (movingDirectionAxisY === 'Down') {
-                this.y += movingSpeed;
-                //if (y === targetY || y >= targetY) {
-                    //this.isMovingY = false;
-                //}
-            }
-        }
-        
-        
     }
 
-    attack(objectives, gameTimer) {
-        const {weapon} = this;
-        /*const {weapon, ammunition} = this;
-        if (e.key === 'q' && collision && weapon.type === 'melee') {
-            weapon.attack(this, objective, generalTimer);
-        } else if (!collision && weapon.type === 'distance' && e.button === 2) {
-            weapon.attack(this, objective, generalTimer, e, ammunition, 'player');
-        }*/
-        this.weapon.attack(this, objectives, gameTimer, null, 'player');
+    if (isMovingY) {
+        if (movingDirectionAxisY === 'Up') {
+            player.y -= movingSpeed;
+            //if (y === targetY || y <= targetY) {
+            //player.isMovingY = false;
+            //}
+        } else if (movingDirectionAxisY === 'Down') {
+            player.y += movingSpeed;
+            //if (y === targetY || y >= targetY) {
+            //player.isMovingY = false;
+            //}
+        }
     }
+}
+
+
+function movingPlayer(player , layerX, layerY) {
+    const {
+        x,
+        y,
+        movingDirectionAxisX,
+        movingDirectionAxisY,
+        isMovingX,
+        isMovingY
+    } = player;
+
+    player.movingDirectionAxisX = (x > layerX) ? player.movingDirectionAxisX = 'Left' : player.movingDirectionAxisX = 'Right';
+    //player.targetX = Math.max(layerX);
+
+    player.movingDirectionAxisY = (y > layerY) ? player.movingDirectionAxisY = 'Up' : player.movingDirectionAxisY = 'Down';
+    //player.targetY = Math.max(layerY);
+
+    player.isMovingX = true;
+    player.isMovingY = true;
 
 }
 
-module.exports = { Player };
+module.exports = { Player, movingPlayer, move, attack };

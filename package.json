@@ -5,9 +5,7 @@
   "main": "server.js",
   "bin":"server.js",
   "scripts": {
-    "run": "nodemon server.js",
-    "compile": "pkg server.js -t node18-win-x64 -o output/server.exe",
-    "compile-linux": "pkg server.js -t node18-linux-x64"
+    "run": "node server.js",
   },
   "author": "",
   "license": "ISC",

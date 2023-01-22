@@ -7,28 +7,30 @@
     <title>JS3 Rebulid Multiplayer</title>
     <link rel='stylesheet' type='text/css' href='index.css'>
     <script src='socket.io-lib\socket.io\client-dist\socket.io.min.js' crossorigin='anonymous'></script>
-    <script src='main.js' defer></script>
+    <script src='main-copy.js' defer></script>
 </head>
 
 <body>
-    <h1>JS3 Rebulid Multiplayer</h1>
+    <h1 id='header-1'>JS3 Rebulid Multiplayer</h1>
     <div id='menu'>
-        <span id='classic-text'>Type your nick</span><br>
+        <span value='123' id='classic-text'>Type your nick</span><br>
         <input id='nick-name' type='text'><br>
         <select id='player-mode'>
             <option value='player'>Player</option>   
             <option value='spectator'>Spectator</option>   
         </select>
+        <span id='classic-text'>Login:</span><br>
+        <input value='user01' id='login' type='text'><br>
         <button id='start-game'>Start Game</button>
     </div>
+    <span class='info' id='server-ping-info'>Ping: </span> <span class='info' id='info'></span><img id='server-save-info' src="img/html/database_icons/database_download.png" width="40px" height="40px">
+    <span class='info' id='server-status-info'>Server status: ...</span>
     <div id='game-window'>
         <canvas class='game-canvas' id='game' width='5000px' height='5000px'></canvas>
         <canvas class='game-canvas' id='dirty-game' width='1400px' height='920px'></canvas>
         <canvas class='game-canvas' id='game-ui' width='1400px' height='920px'></canvas>
         <canvas class='game-canvas' id='click-handler' width='1400px' height='920px'></canvas>
     </div>
-    <p class='info' id='info'></p>
-    <p class='info' id='server-status-info'>Server status: ...</p>
 </body>
 
 </html>

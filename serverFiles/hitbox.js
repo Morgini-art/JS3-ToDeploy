@@ -43,4 +43,43 @@ function checkCollisionWithLineRectangle (x1, y1, x2, y2, hitbox) {
     return false;
 }
 
-module.exports = {Hitbox, checkCollisionWith, checkCollisionWithLines, checkCollisionWithLineRectangle};
+
+function checkCollisionWithLinesSpecial(x1, y1, x2, y2, x3, y3, x4, y4) {
+    const uA = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1));
+    const uB = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1));
+
+    if (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) {
+        const x = x1 + (uA * (x2-x1));
+        const y = y1 + (uA * (y2-y1));
+        return {bool:true, x:x, y:y};
+    }
+    return {bool:false};
+}
+
+function checkCollisionWithLineRectangleSpecial(x1, y1, x2, y2, hitbox) {
+    const {x, y, width, height} = hitbox;
+    const left = checkCollisionWithLinesSpecial(x1, y1, x2, y2, x, y, x, y + height);
+    const right = checkCollisionWithLinesSpecial(x1, y1, x2, y2, x + width, y, x + width, y + height);
+    const top = checkCollisionWithLinesSpecial(x1, y1, x2, y2, x, y, x + width, y);
+    const bottom = checkCollisionWithLinesSpecial(x1, y1, x2, y2, x, y + height, x + width, y + height);
+    
+    if (left.bool || right.bool || top.bool || bottom.bool) {
+        let points = [];
+        if (left.bool) {
+            points.push(left.x,left.y);
+        }
+        if (right.bool) {
+            points.push(right.x,right.y);
+        }
+        if (top.bool) {
+            points.push(top.x,top.y);
+        }
+        if (bottom.bool) {
+            points.push(bottom.x,bottom.y);
+        }
+        return {bool:true, points: points};
+    }
+    return {bool:false};
+}
+
+module.exports = {Hitbox, checkCollisionWith, checkCollisionWithLines, checkCollisionWithLineRectangle, checkCollisionWithLineRectangleSpecial};

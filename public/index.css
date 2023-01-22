@@ -35,6 +35,7 @@ input[type='text']:focus {
 .info {
     text-align: center;
     font-size: 25px;
+    margin: 0;
 }
 
 .game-canvas {
@@ -60,6 +61,7 @@ input[type='text']:focus {
 #game-ui,
 #click-handler,
 #dirty-game {
+/*    image-rendering: pixelated;*/
     grid-column: 1;
     grid-row: 1;
     border: 1px solid black;

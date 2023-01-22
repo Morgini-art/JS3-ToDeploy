@@ -3,7 +3,7 @@ class Invetory{
     basicSlots = [];
     show = false;
 
-    drawInvetory (ctx, functionDrawText, mode, can, graphics) {
+   /* drawInvetory (ctx, functionDrawText, mode, can, graphics) {
         const {basicSlots, numberOfBasicSlots, show} = this;
         //console.log(graphics);
         if (show && mode === 'quick-preview') {
@@ -28,7 +28,37 @@ class Invetory{
                 
             }
         }
-    }
+    }*/
+/*
+{
+  item: {
+    itemName: 'Mały miecz',
+    itemPrice: 7,
+    itemType: 0,
+    itemRarity: 'weapon',
+    itemEffect: false,
+    toBuyInShop: undefined
+  },
+  amount: 2
+}*/
+    
+}
+
+function addItem(invetory, item, amount) {
+    let end = false;
+    invetory.basicSlots.forEach((slot, actualId) => {
+        if (slot.content === 'empty' && !end) {
+            invetory.basicSlots[actualId].content = item;
+            invetory.basicSlots[actualId].amount = amount;
+            console.log(invetory.basicSlots);
+            console.log(slot);
+            end = true;
+        } else if (slot.content.itemName === item.itemName && !end) {
+            invetory.basicSlots[actualId].amount += amount;
+            console.log(slot);
+            end = true;
+        }
+    });
 }
 
 class Recipe {
@@ -86,4 +116,4 @@ function fillInvetoryWithSlots(invetoryObject) {
     Slot map : 6x4 (20 slots)*/
 }
 
-module.exports = {Slot, fillInvetoryWithSlots, Invetory, Item, Recipe, createItemsFromRecipe};
+module.exports = {Slot, fillInvetoryWithSlots, Invetory, Item, Recipe, createItemsFromRecipe, addItem};
